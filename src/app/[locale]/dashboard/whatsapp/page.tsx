@@ -266,7 +266,11 @@ export default function WhatsAppPage() {
     // Fetch initial session data
     const fetchSessionData = async () => {
       try {
-        const response = await fetch("/api/whatsapp");
+      const response = await fetch("/api/whatsapp", {
+  headers: {
+    Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_KEY || "s3dfgERGfdKIhgn234%454$5"}`,
+  },
+});
         const data = await response.json();
         if (data.activeListeningGroups) {
           // Parse JSON string to array
@@ -287,7 +291,11 @@ export default function WhatsAppPage() {
   useEffect(() => {
     const fetchApiKeys = async () => {
       try {
-        const response = await fetch("/api/api-keys");
+       const response = await fetch("/api/whatsapp", {
+  headers: {
+    Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_SECRET_KEY || "s3dfgERGfdKIhgn234%454$5"}`,
+  },
+});
         if (response.ok) {
           const data = await response.json();
           setApiKeys(data);
