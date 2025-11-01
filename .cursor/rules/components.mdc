@@ -1,0 +1,205 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Components Development Guidelines
+
+## Directory Structure
+```
+src/components/
+├── ui/                    # Reusable UI components
+│   ├── button.tsx        # Basic UI elements
+│   ├── navigation-menu.tsx
+│   ├── toast.tsx
+│   └── ...
+├── layout/               # Layout components
+│   ├── header.tsx
+│   ├── footer.tsx
+│   └── ...
+├── features/            # Feature-specific components
+│   ├── auth/
+│   ├── dashboard/
+│   └── ...
+└── shared/             # Shared components across features
+    ├── icons/
+    └── ...
+```
+
+## Component Organization
+
+### UI Components (`/ui`)
+- Place all Radix UI based components in the `ui` directory
+- Each component should be in its own file
+- Follow the naming convention: `component-name.tsx`
+- Include component variants using `class-variance-authority`
+- Export all necessary types and utilities
+- Example structure:
+  ```tsx
+  // button.tsx
+  import { cva } from "class-variance-authority"
+  import { cn } from "@/lib/utils"
+  
+  const componentVariants = cva(...)
+  export interface ComponentProps {...}
+  export const Component = React.forwardRef<...>(...)
+  export { componentVariants }
+  ```
+
+### Layout Components (`/layout`)
+- Components that define the page structure
+- Should be responsive and handle common layout patterns
+- Include header, footer, sidebar, and other layout elements
+- Use semantic HTML elements
+- Example:
+  ```tsx
+  // header.tsx
+  export function Header() {
+    return (
+      <header className="border-b">
+        <nav>...</nav>
+      </header>
+    )
+  }
+  ```
+
+### Feature Components (`/features`)
+- Group components by feature/domain
+- Each feature should have its own directory
+- Include feature-specific logic and state management
+- Keep components focused and single-responsibility
+- Example structure:
+  ```
+  features/
+  ├── auth/
+  │   ├── login-form.tsx
+  │   └── signup-form.tsx
+  └── dashboard/
+      ├── stats-card.tsx
+      └── activity-feed.tsx
+  ```
+
+### Shared Components (`/shared`)
+- Components used across multiple features
+- Should be highly reusable and configurable
+- Include common icons, loaders, and utility components
+- Example:
+  ```
+  shared/
+  ├── icons/
+  │   ├── index.ts
+  │   └── icon-name.tsx
+  └── loaders/
+      └── spinner.tsx
+  ```
+
+## Component Development Guidelines
+
+### 1. Component Structure
+- Use TypeScript for all components
+- Include proper type definitions
+- Use React.forwardRef for components that need refs
+- Export component types and variants
+- Include JSDoc comments for complex components
+
+### 2. Styling
+- Use Tailwind CSS for styling
+- Follow the utility-first approach
+- Use `cn()` utility for conditional classes
+- Define variants using `class-variance-authority`
+- Example:
+  ```tsx
+  const variants = cva(
+    "base-styles",
+    {
+      variants: {
+        variant: {
+          default: "default-styles",
+          // other variants...
+        }
+      }
+    }
+  )
+  ```
+
+### 3. Props and Types
+- Define clear prop interfaces
+- Use descriptive prop names
+- Include proper TypeScript types
+- Document complex props with JSDoc
+- Example:
+  ```tsx
+  interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+    variant?: "default" | "outline" | "ghost"
+    size?: "default" | "sm" | "lg"
+    asChild?: boolean
+  }
+  ```
+
+### 4. Accessibility
+- Use semantic HTML elements
+- Include proper ARIA attributes
+- Ensure keyboard navigation works
+- Test with screen readers
+- Follow Radix UI accessibility guidelines
+
+### 5. Performance
+- Use React.memo() when appropriate
+- Implement proper cleanup in useEffect
+- Avoid unnecessary re-renders
+- Use proper event delegation
+- Example:
+  ```tsx
+  const Component = React.memo(function Component({ prop }) {
+    // Component logic
+  })
+  ```
+
+### 6. Testing
+- Write unit tests for all components
+- Test component variants
+- Test accessibility features
+- Test user interactions
+- Use React Testing Library
+
+### 7. Documentation
+- Include JSDoc comments for complex components
+- Document props and their types
+- Include usage examples
+- Document accessibility features
+- Example:
+  ```tsx
+  /**
+   * Button component with various variants and sizes
+   * @param {ButtonProps} props - Component props
+   * @returns {JSX.Element} Rendered button
+   */
+  ```
+
+### 8. State Management
+- Use React's built-in state for simple state
+- Consider using React Context for complex state
+- Keep state as close as possible to where it's needed
+- Use proper state management patterns
+
+### 9. Error Handling
+- Implement proper error boundaries
+- Handle loading states
+- Provide fallback UI
+- Include error messages
+- Example:
+  ```tsx
+  class ErrorBoundary extends React.Component {
+    // Error boundary implementation
+  }
+  ```
+
+### 10. Best Practices
+- Keep components focused and single-responsibility
+- Use proper naming conventions
+- Follow consistent patterns
+- Implement proper cleanup
+- Use proper TypeScript features
+- Follow React best practices
+- Maintain consistent code style
+

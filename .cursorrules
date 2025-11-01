@@ -1,0 +1,253 @@
+# Cursor AI Rules for Real Estate AI Project
+
+## Project Overview
+This is a Next.js 14+ real estate AI application with full dark/light mode support, internationalization (i18n), authentication, and WhatsApp integration. The project uses TypeScript, Tailwind CSS, shadcn/ui components, and Prisma.
+
+## Core Development Principles
+
+### 🎨 Dark/Light Mode Requirements (CRITICAL)
+**Every new component, page, or feature MUST support both dark and light modes:**
+
+1. **Use Semantic CSS Variables ONLY**
+   - ✅ Use: `bg-background`, `text-foreground`, `border-border`
+   - ✅ Use: `bg-card`, `text-card-foreground`, `bg-muted`, `text-muted-foreground`
+   - ✅ Use: `bg-primary`, `text-primary-foreground`, `bg-accent`, `text-accent-foreground`
+   - ❌ NEVER use: `bg-white`, `bg-black`, `text-gray-600`, `border-gray-200`
+   - ❌ NEVER use: hardcoded colors like `#ffffff`, `rgb(255,255,255)`
+
+2. **Component Styling Guidelines**
+   ```tsx
+   // ✅ CORRECT - Uses semantic colors
+   <div className="bg-card border border-border text-card-foreground">
+     <h1 className="text-foreground">Title</h1>
+     <p className="text-muted-foreground">Description</p>
+     <Button variant="outline">Action</Button>
+   </div>
+
+   // ❌ WRONG - Uses hardcoded colors
+   <div className="bg-white border border-gray-200 text-black">
+     <h1 className="text-gray-900">Title</h1>
+     <p className="text-gray-600">Description</p>
+   </div>
+   ```
+
+3. **Available Semantic Colors**
+   - **Backgrounds**: `bg-background`, `bg-card`, `bg-popover`, `bg-muted`, `bg-accent`, `bg-secondary`
+   - **Text**: `text-foreground`, `text-card-foreground`, `text-muted-foreground`, `text-accent-foreground`
+   - **Borders**: `border-border`, `border-input`
+   - **Interactive**: `bg-primary`, `bg-destructive`, `hover:bg-accent`, `focus:ring-ring`
+
+4. **Testing Dark/Light Mode**
+   - Always test components in both light and dark modes
+   - Use the theme toggle in the header to verify appearance
+   - Ensure proper contrast ratios are maintained
+
+### 🧩 Component Development
+
+1. **UI Components**
+   - Use existing shadcn/ui components when possible
+   - All custom components must extend the semantic color system
+   - Follow the established pattern in `src/components/ui/`
+
+2. **Component Structure**
+   ```tsx
+   'use client' // Only when needed (hooks, events, etc.)
+   
+   import { cn } from '@/lib/utils'
+   import { Button } from '@/components/ui/button'
+   
+   interface ComponentProps {
+     // Define props with TypeScript
+   }
+   
+   export function Component({ className, ...props }: ComponentProps) {
+     return (
+       <div className={cn("bg-card border border-border", className)}>
+         {/* Component content with semantic colors */}
+       </div>
+     )
+   }
+   ```
+
+3. **Button Variants**
+   - Use established button variants: `default`, `destructive`, `outline`, `secondary`, `ghost`, `link`
+   - Don't create custom button styles unless absolutely necessary
+
+### 🌍 Internationalization (i18n)
+
+1. **Text Content**
+   - ALL user-facing text must use translations
+   - Use `useTranslations` hook from `next-intl`
+   - Add translations to `src/i18n/translations/[locale].json`
+
+2. **Translation Usage**
+   ```tsx
+   import { useTranslations } from 'next-intl'
+   
+   export function Component() {
+     const t = useTranslations('componentName')
+     
+     return (
+       <div>
+         <h1>{t('title')}</h1>
+         <p>{t('description')}</p>
+       </div>
+     )
+   }
+   ```
+
+3. **Supported Locales**
+   - English (`en`) - default
+   - Spanish (`es`)
+   - French (`fr`)
+
+### 🔐 Authentication & Authorization
+
+1. **Session Management**
+   - Use `useSession` from `next-auth/react`
+   - Check authentication status before rendering protected content
+   - Handle loading states appropriately
+
+2. **Role-Based Access**
+   - Admin features require `session?.user?.role === 'ADMIN'`
+   - Use proper conditional rendering for role-specific content
+
+### 📱 Responsive Design
+
+1. **Mobile-First Approach**
+   - Design for mobile first, then enhance for larger screens
+   - Use Tailwind responsive prefixes: `sm:`, `md:`, `lg:`, `xl:`
+   - Test on multiple screen sizes
+
+2. **Common Breakpoints**
+   - Mobile: default (< 640px)
+   - Tablet: `sm:` (≥ 640px)
+   - Desktop: `lg:` (≥ 1024px)
+   - Large: `xl:` (≥ 1280px)
+
+### 🎯 Code Quality Standards
+
+1. **TypeScript**
+   - Use strict TypeScript
+   - Define proper interfaces for all props
+   - Avoid `any` type - use proper typing
+
+2. **Error Handling**
+   - Always handle async operations with try/catch
+   - Provide user feedback for errors using toast notifications
+   - Use loading states for async operations
+
+3. **Performance**
+   - Use `React.memo` for expensive components
+   - Implement proper loading states
+   - Optimize images with Next.js Image component
+
+### 🗂️ File Organization
+
+1. **Component Structure**
+   ```
+   src/components/
+   ├── ui/           # Reusable UI components (shadcn/ui)
+   ├── layout/       # Layout-specific components
+   ├── nav/          # Navigation components
+   ├── providers/    # Context providers
+   └── [feature]/    # Feature-specific components
+   ```
+
+2. **Naming Conventions**
+   - Components: `PascalCase` (e.g., `UserProfile.tsx`)
+   - Files: `kebab-case` for pages, `PascalCase` for components
+   - Variables/functions: `camelCase`
+
+### 🎨 Styling Guidelines
+
+1. **Tailwind CSS**
+   - Use utility classes for styling
+   - Group related classes logically
+   - Use the `cn()` utility for conditional classes
+
+2. **Custom Styles**
+   - Avoid custom CSS when possible
+   - Use CSS variables for theming (already set up)
+   - Follow the established design system
+
+### 🔄 State Management
+
+1. **Local State**
+   - Use `useState` for component-level state
+   - Use `useReducer` for complex state logic
+
+2. **Global State**
+   - Use React Context for shared state
+   - Consider state management libraries for complex apps
+
+### 🧪 Development Workflow
+
+1. **Before Creating New Components**
+   - Check if similar functionality exists
+   - Ensure dark/light mode compatibility
+   - Plan for internationalization
+   - Consider responsive design
+
+2. **Code Review Checklist**
+   - ✅ Dark/light mode support
+   - ✅ Proper TypeScript typing
+   - ✅ Internationalization
+   - ✅ Responsive design
+   - ✅ Error handling
+   - ✅ Loading states
+   - ✅ Accessibility
+
+### 📋 Common Patterns
+
+1. **Loading States**
+   ```tsx
+   {loading ? (
+     <div className="flex justify-center items-center py-4">
+       <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-foreground"></div>
+     </div>
+   ) : (
+     // Content
+   )}
+   ```
+
+2. **Error States**
+   ```tsx
+   {error && (
+     <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded mb-4">
+       {error}
+     </div>
+   )}
+   ```
+
+3. **Empty States**
+   ```tsx
+   {items.length === 0 ? (
+     <div className="text-center py-8">
+       <p className="text-muted-foreground">{t('noItemsFound')}</p>
+     </div>
+   ) : (
+     // Items list
+   )}
+   ```
+
+## Project-Specific Notes
+
+### WhatsApp Integration
+- WebSocket connections handled in `whatsapp-agent/`
+- Real-time messaging components in `src/components/whatsapp/`
+- Ensure proper connection state management
+
+### Database
+- Uses Prisma ORM with SQLite
+- Schema defined in `prisma/schema.prisma`
+- Migrations in `prisma/migrations/`
+
+### API Routes
+- Next.js API routes in `src/app/api/`
+- Proper error handling and validation
+- Authentication middleware where needed
+
+---
+
+**Remember: Every new addition to this project MUST support both dark and light modes using semantic CSS variables. This is non-negotiable for maintaining consistency and user experience.**

@@ -1,0 +1,39 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Next.js App Router Guide
+
+This project uses Next.js 13+ with the App Router pattern. Here's how it works:
+
+## App Router Structure
+The `src/app` directory uses Next.js 13+ file-system based routing:
+
+- `page.tsx` - Defines the UI for a route segment
+- `layout.tsx` - Shared UI for a segment and its children
+- `globals.css` - Global styles and Tailwind CSS imports
+
+## Key Concepts
+
+### Layouts
+- [src/app/layout.tsx](mdc:src/app/layout.tsx) is the root layout
+- Layouts wrap pages and other layouts
+- They persist across route changes
+- They can be nested
+
+### Pages
+- [src/app/page.tsx](mdc:src/app/page.tsx) is the main page
+- Pages are UI components that are unique to a route
+- They can fetch data and define metadata
+
+### Styling
+- [src/app/globals.css](mdc:src/app/globals.css) contains global styles
+- Uses Tailwind CSS for utility-first styling
+- PostCSS processes the styles (configured in [postcss.config.mjs](mdc:postcss.config.mjs))
+
+## Development
+- Run `npm run dev` to start the development server
+- The app will be available at `http://localhost:3000`
+- Changes to files in `src/app` will trigger hot reloading
+

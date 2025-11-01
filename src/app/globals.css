@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --muted: #f6f6f6;
+  --muted-foreground: #737373;
+  --popover: #ffffff;
+  --popover-foreground: #171717;
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --primary: #171717;
+  --primary-foreground: #fafafa;
+  --secondary: #f6f6f6;
+  --secondary-foreground: #171717;
+  --accent: #f6f6f6;
+  --accent-foreground: #171717;
+  --destructive: #ef4444;
+  --destructive-foreground: #fafafa;
+  --ring: #171717;
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --muted: #262626;
+  --muted-foreground: #a3a3a3;
+  --popover: #0a0a0a;
+  --popover-foreground: #ededed;
+  --card: #0a0a0a;
+  --card-foreground: #ededed;
+  --border: #262626;
+  --input: #262626;
+  --primary: #ededed;
+  --primary-foreground: #171717;
+  --secondary: #262626;
+  --secondary-foreground: #ededed;
+  --accent: #262626;
+  --accent-foreground: #ededed;
+  --destructive: #ef4444;
+  --destructive-foreground: #fafafa;
+  --ring: #d4d4d8;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-ring: var(--ring);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Dark mode specific overrides */
+.dark .bg-white {
+  background-color: hsl(var(--card));
+}
+
+.dark .text-gray-600 {
+  color: hsl(var(--muted-foreground));
+}
+
+.dark .text-gray-900 {
+  color: hsl(var(--foreground));
+}
+
+.dark .border-gray-200 {
+  border-color: hsl(var(--border));
+}
+
+.dark .border-gray-700 {
+  border-color: hsl(var(--border));
+}
+
+.dark .bg-gray-50 {
+  background-color: hsl(var(--muted));
+}
+
+.dark .bg-gray-800 {
+  background-color: hsl(var(--muted));
+}
+
+.dark .text-gray-100 {
+  color: hsl(var(--foreground));
+}
+
+.dark .text-gray-500 {
+  color: hsl(var(--muted-foreground));
+}

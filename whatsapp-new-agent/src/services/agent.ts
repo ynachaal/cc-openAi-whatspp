@@ -1,0 +1,294 @@
+import OpenAI from "openai";
+import { z } from "zod";
+import { DatabaseService } from './database';
+
+// Global OpenAI instance that can be updated
+let openai: OpenAI;
+
+// Function to get OpenAI API key from database
+async function getOpenAIApiKey(): Promise<string> {
+    try {
+        const databaseService = DatabaseService.getInstance();
+        const apiKeys = await databaseService.getApiKeys();
+        
+        if (apiKeys?.openaiKey) {
+            console.log("Using OpenAI API key from database");
+            return apiKeys.openaiKey;
+        } else if (process.env['OPENAI_API_KEY']) {
+            console.log("Using OpenAI API key from environment variables");
+            return process.env['OPENAI_API_KEY'];
+        } else {
+            throw new Error("OpenAI API key is not configured. Please set it in the admin panel.");
+        }
+    } catch (error) {
+        console.error("Error fetching OpenAI API key:", error);
+        if (process.env['OPENAI_API_KEY']) {
+            console.log("Falling back to environment variable");
+            return process.env['OPENAI_API_KEY'];
+        }
+        throw new Error("OpenAI API key is not configured. Please set it in the admin panel.");
+    }
+}
+
+// Initialize OpenAI with API key (can be updated later)
+async function initializeOpenAI(apiKey?: string) {
+    const key = apiKey || await getOpenAIApiKey();
+    openai = new OpenAI({
+        apiKey: key
+    });
+}
+
+// Function to update the OpenAI client with a new API key
+export function updateOpenAIModel(apiKey: string) {
+    if (!apiKey) {
+        console.warn("OpenAI API key is empty, using default");
+        return;
+    }
+    
+    console.log("Updating OpenAI client with new API key");
+    openai = new OpenAI({
+        apiKey: apiKey
+    });
+}
+
+// Fallback schema for when no database fields are configured
+const fallbackSchema = z.object({
+    transaction_type: z.enum(["buy", "sell", "rent", "general"]),
+    property_type: z.string().optional().nullable(),
+    location: z.string().optional().nullable(),
+    price: z.number().optional().nullable(),
+    note: z.string().optional().nullable(),
+});
+
+// Function to get sheet fields from database
+async function getSheetFields(): Promise<any[]> {
+    try {
+        const databaseService = DatabaseService.getInstance();
+        const fields = await databaseService.getSheetFields();
+        return fields || [];
+    } catch (error) {
+        console.error("Error fetching sheet fields:", error);
+        return [];
+    }
+}
+
+// Function to build dynamic schema based on sheet fields
+async function buildDynamicSchema(): Promise<any> {
+    const sheetFields = await getSheetFields();
+    
+    if (sheetFields.length === 0) {
+        console.log("No sheet fields configured, using fallback schema");
+        // Return union of single object or array for fallback
+        return z.union([fallbackSchema, z.array(fallbackSchema)]);
+    }
+    
+    // Build schema object dynamically from database fields
+    const schemaFields: any = {};
+    
+    sheetFields.forEach(field => {
+        let fieldSchema: any;
+        
+        switch (field.fieldType) {
+            case 'text':
+                fieldSchema = z.string().optional().nullable();
+                break;
+            case 'number':
+                fieldSchema = z.number().optional().nullable();
+                break;
+            case 'date':
+                fieldSchema = z.string().optional().nullable();
+                break;
+            case 'boolean':
+                fieldSchema = z.boolean().optional();
+                break;
+            case 'enum':
+                if (field.enumValues) {
+                    try {
+                        const enumValues = JSON.parse(field.enumValues);
+                        if (Array.isArray(enumValues) && enumValues.length > 0) {
+                            fieldSchema = z.enum(enumValues as [string, ...string[]]).optional().nullable();
+                        } else {
+                            fieldSchema = z.string().optional().nullable();
+                        }
+                    } catch {
+                        fieldSchema = z.string().optional().nullable();
+                    }
+                } else {
+                    fieldSchema = z.string().optional().nullable();
+                }
+                break;
+            case 'array':
+                fieldSchema = z.array(z.string()).optional().nullable();
+                break;
+            default:
+                fieldSchema = z.string().optional().nullable();
+        }
+        
+        schemaFields[field.fieldName] = fieldSchema;
+    });
+    
+    const singleObjectSchema = z.object(schemaFields);
+    
+    // Return union of single object or array of objects to handle both cases
+    return z.union([singleObjectSchema, z.array(singleObjectSchema)]);
+}
+
+// Function to build dynamic system prompt based on sheet fields
+async function buildSystemPrompt(): Promise<string> {
+    const sheetFields = await getSheetFields();
+    
+    let fieldsDescription = '';
+    if (sheetFields.length > 0) {
+        fieldsDescription = '\n# Output Schema\n';
+        sheetFields.forEach(field => {
+            const required = field.isRequired ? ' (Required)' : '';
+            fieldsDescription += `- "${field.fieldName}": ${field.fieldType}${required}\n`;
+            if (field.description) {
+                fieldsDescription += `  ${field.description}\n`;
+            }
+            if (field.fieldType === 'enum' && field.enumValues) {
+                try {
+                    const enumValues = JSON.parse(field.enumValues);
+                    if (Array.isArray(enumValues)) {
+                        fieldsDescription += `  Allowed values: ${enumValues.join(', ')}\n`;
+                    }
+                } catch {}
+            }
+        });
+    } else {
+        fieldsDescription = `
+# Output Schema
+- "transaction_type": "buy" | "sell" | "rent" | "general"
+- "property_type": string | null
+- "location": string | null
+- "price": number | null
+- "note": string | null
+`;
+    }
+    
+    return `
+You are a real estate assistant tasked with analyzing user-provided messages to extract detailed property information.
+
+CRITICAL TASK: Analyze the message to detect if it contains information about multiple properties or just one property.
+
+## Multiple Property Detection:
+Look for ANY indication of multiple properties including:
+- Multiple different locations mentioned
+- Multiple different prices mentioned  
+- Multiple different property types (apartment, villa, studio, etc.)
+- Multiple different sizes or bedroom counts
+- Any separators between property descriptions (line breaks, dashes, bullets, etc.)
+- Multiple transaction types (some for rent, some for sale)
+- Lists in any format (numbered, bulleted, or just separated)
+- Words indicating plurality: "properties", "units", "apartments", "villas"
+- Phrases like "available", "we have", "multiple", "several", "various"
+
+## Response Format Rules:
+
+**If MULTIPLE properties detected:**
+- Return a JSON array where each element is a property object
+- Each property must be a complete, separate entry
+- Extract all available information for each property individually
+- Even if properties share some common information, create separate complete objects
+
+**If SINGLE property detected:**  
+- Return a single JSON object (not wrapped in array)
+
+## Extraction Guidelines:
+${fieldsDescription}
+
+## Processing Rules:
+1. **CRITICAL**: Multiple properties = JSON ARRAY, Single property = JSON OBJECT
+2. Clean emojis and formatting symbols from extracted data
+3. Convert prices to numbers only (remove currency symbols, k=thousands, m=millions)
+4. Extract location, size, bedrooms, bathrooms, price for each property separately
+5. Handle ANY message format - structured or unstructured
+6. Contact information applies to all properties if mentioned once
+7. If uncertain whether single or multiple, err on the side of multiple (return array)
+8. Return valid JSON only - no explanatory text
+
+## Example Scenarios:
+
+Multiple properties (ANY format):
+- "2BR Marina 1.5M, 3BR Downtown 2.1M" → ARRAY of 2 objects
+- "Villa in Jumeirah for sale. Also have apartment in Marina for rent" → ARRAY of 2 objects  
+- "Available: Studio 800K, 1BR 1.2M, 2BR 1.8M" → ARRAY of 3 objects
+- "Properties in Dubai: Marina apartment, JBR villa, Downtown penthouse" → ARRAY of 3 objects
+
+Single property:
+- "2BR apartment Marina 1.5M" → SINGLE object
+- "Looking for villa in Jumeirah around 3M budget" → SINGLE object
+
+REMEMBER: If you detect multiple distinct properties (different locations, prices, types, sizes), return an array. Otherwise return a single object.
+`;
+}
+
+export async function analyzeMessage(message: string) {
+    // Initialize OpenAI client if not already done or if API key is missing
+    if (!openai || !openai.apiKey) {
+        try {
+            await initializeOpenAI();
+        } catch (error) {
+            console.error("Failed to initialize OpenAI client:", error);
+            throw new Error("OpenAI API key is not configured. Please set it in the admin panel.");
+        }
+    }
+
+    try {
+        // Build dynamic prompt and schema
+        const systemPrompt = await buildSystemPrompt();
+        const dynamicSchema = await buildDynamicSchema();
+        
+        const completion = await openai.chat.completions.create({
+            model: "gpt-5-mini",
+            messages: [
+                {
+                    role: "system",
+                    content: systemPrompt
+                },
+                {
+                    role: "user",
+                    content: `Analyze the following message/image: ${message}`
+                }
+            ],
+            reasoning_effort:"low"
+        });
+
+        const response = completion.choices[0]?.message?.content;
+        if (!response) {
+            throw new Error("No response from OpenAI");
+        }
+
+        // Clean the response to extract JSON (remove any extra text)
+        let cleanResponse = response.trim();
+        
+        // Try to extract JSON from the response if it contains extra text
+        const jsonMatch = cleanResponse.match(/(\[.*\]|\{.*\})/s);
+        if (jsonMatch && jsonMatch[1]) {
+            cleanResponse = jsonMatch[1];
+        }
+
+        // Parse the JSON response
+        const result = JSON.parse(cleanResponse);
+        
+        // Validate the result against our dynamic schema
+        const validatedResult = dynamicSchema.parse(result);
+
+        // Log the result type for debugging
+        if (Array.isArray(validatedResult)) {
+            console.log(`🔍 AI detected ${validatedResult.length} properties in the message`);
+            console.log("🔍 Property types:", validatedResult.map((p: any) => p.property_type || p.transaction_type).join(', '));
+        } else {
+            console.log("🔍 AI detected 1 property in the message");
+            console.log("🔍 Property type:", validatedResult.property_type || validatedResult.transaction_type);
+        }
+
+        return validatedResult;
+    } catch (e: any) {
+        console.error("Error analyzing message:", e);
+        return {
+            not_real_estate: "The message is not related to real estate or could not be parsed.",
+            error: e.message || e.toString()
+        };
+    }
+}

@@ -1,0 +1,89 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Radix UI Component Guidelines
+
+## Component Structure
+- All Radix UI components should be wrapped in a custom component that handles styling and additional functionality
+- Components should be placed in `src/components/ui/` directory
+- Each component should have its own directory with the following structure:
+  ```
+  component-name/
+  ├── index.tsx        # Main component export
+  ├── styles.ts        # Component-specific styles
+  └── types.ts         # TypeScript types/interfaces
+  ```
+
+## Styling Conventions
+- Use Tailwind CSS for styling Radix UI components
+- Utilize `class-variance-authority` for component variants
+- Use `clsx` and `tailwind-merge` for conditional class names
+- Follow this pattern for component styling:
+  ```tsx
+  import { cva } from 'class-variance-authority'
+  import { cn } from '@/lib/utils'
+
+  const componentVariants = cva(
+    'base-styles',
+    {
+      variants: {
+        variant: {
+          default: 'default-styles',
+          // other variants...
+        },
+        size: {
+          default: 'default-size',
+          // other sizes...
+        }
+      },
+      defaultVariants: {
+        variant: 'default',
+        size: 'default'
+      }
+    }
+  )
+  ```
+
+## Accessibility
+- Always maintain Radix UI's built-in accessibility features
+- Don't remove or override ARIA attributes
+- Test components with screen readers
+- Ensure keyboard navigation works as expected
+
+## Component Usage
+- Import components from the ui directory:
+  ```tsx
+  import { Button } from '@/components/ui/button'
+  ```
+- Use semantic HTML elements when possible
+- Maintain consistent prop naming across components
+- Document component props using JSDoc comments
+
+## State Management
+- Use React's built-in state management for simple state
+- Consider using React Context for complex state management
+- Keep state as close as possible to where it's needed
+
+## Testing
+- Write unit tests for all custom Radix UI components
+- Test both visual and functional aspects
+- Include accessibility testing
+- Test component variants and states
+
+## Performance
+- Use React.memo() for components that don't need frequent re-renders
+- Implement proper cleanup in useEffect hooks
+- Avoid unnecessary re-renders
+- Use proper event delegation
+
+## Best Practices
+- Keep components focused and single-responsibility
+- Use TypeScript for type safety
+- Follow consistent naming conventions
+- Document complex logic and decisions
+- Use proper error boundaries
+- Implement proper loading states
+
+

@@ -1,0 +1,148 @@
+{
+  "common": {
+    "appName": "Compass & Coin",
+    "gettingStarted": "Commencer",
+    "learnNextjs": "Apprendre Next.js",
+    "learnNextjsDescription": "Apprenez Next.js dans un cours interactif.",
+    "templates": "Modèles",
+    "templatesDescription": "Explorez la collection de modèles Next.js.",
+    "documentation": "Documentation",
+    "documentationDescription": "Apprenez les fonctionnalités et l'API de Next.js."
+  },
+  "auth": {
+    "signIn": "Se connecter",
+    "signOut": "Se déconnecter",
+    "userAvatar": "Avatar de l'utilisateur"
+  },
+  "theme": {
+    "light": "Clair",
+    "dark": "Sombre",
+    "system": "Système",
+    "toggleTheme": "Changer de thème"
+  },
+  "language": {
+    "en": "Anglais",
+    "es": "Espagnol",
+    "fr": "Français",
+    "switchLanguage": "Changer de langue"
+  },
+  "whatsapp": {
+    "googleSheetsTitle": "Intégration Google Sheets",
+    "googleSheetsDescription": "Configurez votre document Google Sheets pour le stockage des données",
+    "googleSheetUrl": "URL Google Sheet",
+    "googleSheetUrlPlaceholder": "Collez votre URL Google Sheets ici ou entrez l'ID de la feuille",
+    "googleSheetUrlHelp": "Vous pouvez coller l'URL complète Google Sheets ou seulement l'ID de la feuille",
+    "openSheet": "Ouvrir la Feuille",
+    "editUrl": "Modifier l'URL",
+    "saveChanges": "Enregistrer les Modifications",
+    "cancel": "Annuler",
+    "notConfigured": "Non configuré",
+    "invalidUrl": "Format d'URL ou d'ID Google Sheet invalide",
+    "urlRequired": "URL ou ID Google Sheet requis",
+    "whatsappStatus": "Statut WhatsApp",
+    "connected": "Connecté",
+    "disconnected": "Déconnecté",
+    "editSelectedGroups": "Modifier les Groupes Sélectionnés",
+    "hideGroupsEditor": "Masquer l'Éditeur de Groupes",
+    "connectionStatus": "État de la Connexion",
+    "disconnect": {
+      "title": "Déconnecter WhatsApp",
+      "description": "Ceci déconnectera votre session WhatsApp. Vous devrez scanner le code QR à nouveau pour vous reconnecter.",
+      "confirmationLabel": "Tapez 'DECONNECTER' pour confirmer",
+      "confirmationPlaceholder": "Tapez DECONNECTER ici",
+      "confirmationError": "Veuillez taper 'DECONNECTER' exactement pour confirmer",
+      "button": "Déconnecter"
+    },
+    "resetEverything": {
+      "title": "Tout Réinitialiser",
+      "description": "Cette action réinitialisera toutes les connexions WhatsApp, messages et paramètres. Ceci ne peut pas être annulé.",
+      "confirmationLabel": "Tapez 'TOUT REINITIALISER' pour confirmer",
+      "confirmationPlaceholder": "Tapez TOUT REINITIALISER ici",
+      "confirmationError": "Veuillez taper 'TOUT REINITIALISER' exactement pour confirmer",
+      "button": "Oui, Tout Réinitialiser"
+    }
+  },
+  "home": {
+    "welcome": "Bienvenue sur le Panneau IA de Compass & Coin",
+    "subtitle": "Votre Assistant Immobilier Intelligent",
+    "description": "Rationalisez vos opérations immobilières avec notre plateforme avancée alimentée par l'IA. Connectez WhatsApp, gérez les prospects et automatisez votre flux de travail avec des insights intelligents.",
+    "getStarted": "Accédez à votre tableau de bord IA pour commencer à gérer vos opérations immobilières",
+    "accessDashboard": "Accéder au Tableau de Bord",
+    "learnMore": "En Savoir Plus",
+    "features": {
+      "whatsapp": "Intégration WhatsApp",
+      "whatsappDesc": "Connectez et gérez les conversations WhatsApp en toute transparence",
+      "automation": "Automatisation Intelligente",
+      "automationDesc": "Automatisez le traitement des prospects et les interactions clients",
+      "analytics": "Analyses en Temps Réel",
+      "analyticsDesc": "Obtenez des insights sur les performances de votre entreprise"
+    },
+    "toasts": {
+      "deploymentStarted": {
+        "title": "Déploiement démarré",
+        "description": "Votre application est en cours de déploiement sur Vercel."
+      },
+      "documentation": {
+        "title": "Documentation",
+        "description": "Ouverture de la documentation Next.js dans un nouvel onglet."
+      },
+      "learningResources": {
+        "title": "Ressources d'apprentissage",
+        "description": "Ouverture des ressources d'apprentissage Next.js dans un nouvel onglet."
+      },
+      "examples": {
+        "title": "Exemples",
+        "description": "Ouverture des exemples Next.js dans un nouvel onglet."
+      },
+      "nextjsWebsite": {
+        "title": "Site Web Next.js",
+        "description": "Ouverture de nextjs.org dans un nouvel onglet."
+      }
+    }
+  },
+  "admin": {
+    "title": "Gestion des Utilisateurs",
+    "description": "Gérer les utilisateurs, rôles et permissions",
+    "createUser": "Créer un Utilisateur",
+    "createUserDescription": "Ajouter un nouvel utilisateur au système",
+    "userList": "Liste des Utilisateurs",
+    "userListDescription": "Gérer les utilisateurs existants et leurs permissions",
+    "name": "Nom",
+    "email": "E-mail",
+    "password": "Mot de Passe",
+    "role": "Rôle",
+    "status": "Statut",
+    "actions": "Actions",
+    "roleUser": "Utilisateur",
+    "roleAdmin": "Administrateur",
+    "active": "Actif",
+    "inactive": "Inactif",
+    "noName": "Aucun Nom",
+    "noUsers": "Aucun utilisateur trouvé",
+    "changePassword": "Changer le Mot de Passe",
+    "changePasswordDescription": "Entrez un nouveau mot de passe pour cet utilisateur",
+    "editUser": "Modifier l'Utilisateur",
+    "editUserDescription": "Modifier les informations et le rôle de l'utilisateur",
+    "newPassword": "Nouveau Mot de Passe",
+    "confirmPassword": "Confirmer le Mot de Passe",
+    "updatePassword": "Mettre à Jour le Mot de Passe",
+    "updateUser": "Mettre à Jour l'Utilisateur",
+    "updateUserDescription": "Mettre à jour les informations et le rôle de l'utilisateur",
+    "delete": "Supprimer",
+    "cancel": "Annuler",
+    "success": "Succès",
+    "error": "Erreur",
+    "fillAllFields": "Veuillez remplir tous les champs requis",
+    "passwordsDoNotMatch": "Les mots de passe ne correspondent pas",
+    "fetchUsersError": "Échec de la récupération des utilisateurs",
+    "userCreatedSuccess": "Utilisateur créé avec succès",
+    "createUserError": "Échec de la création de l'utilisateur",
+    "passwordUpdatedSuccess": "Mot de passe mis à jour avec succès",
+    "updatePasswordError": "Échec de la mise à jour du mot de passe",
+    "userDeletedSuccess": "Utilisateur supprimé avec succès",
+    "deleteUserError": "Échec de la suppression de l'utilisateur",
+    "deleteUserConfirm": "Êtes-vous sûr de vouloir supprimer l'utilisateur '{name}' ? Cette action ne peut pas être annulée.",
+    "userUpdatedSuccess": "Utilisateur mis à jour avec succès",
+    "updateUserError": "Échec de la mise à jour de l'utilisateur"
+  }
+} 

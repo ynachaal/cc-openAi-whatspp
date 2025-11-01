@@ -1,0 +1,148 @@
+{
+  "common": {
+    "appName": "Compass & Coin",
+    "gettingStarted": "Comenzar",
+    "learnNextjs": "Aprender Next.js",
+    "learnNextjsDescription": "Aprende sobre Next.js en un curso interactivo.",
+    "templates": "Plantillas",
+    "templatesDescription": "Explora la colección de plantillas de Next.js.",
+    "documentation": "Documentación",
+    "documentationDescription": "Aprende sobre las características y API de Next.js."
+  },
+  "auth": {
+    "signIn": "Iniciar sesión",
+    "signOut": "Cerrar sesión",
+    "userAvatar": "Avatar del usuario"
+  },
+  "theme": {
+    "light": "Claro",
+    "dark": "Oscuro",
+    "system": "Sistema",
+    "toggleTheme": "Cambiar tema"
+  },
+  "language": {
+    "en": "Inglés",
+    "es": "Español",
+    "fr": "Francés",
+    "switchLanguage": "Cambiar idioma"
+  },
+  "whatsapp": {
+    "googleSheetsTitle": "Integración de Google Sheets",
+    "googleSheetsDescription": "Configura tu documento de Google Sheets para almacenamiento de datos",
+    "googleSheetUrl": "URL de Google Sheet",
+    "googleSheetUrlPlaceholder": "Pega tu URL de Google Sheets aquí o ingresa el ID de la hoja",
+    "googleSheetUrlHelp": "Puedes pegar la URL completa de Google Sheets o solo el ID de la hoja",
+    "openSheet": "Abrir Hoja",
+    "editUrl": "Editar URL",
+    "saveChanges": "Guardar Cambios",
+    "cancel": "Cancelar",
+    "notConfigured": "No configurado",
+    "invalidUrl": "Formato de URL o ID de Google Sheet inválido",
+    "urlRequired": "Se requiere URL o ID de Google Sheet",
+    "whatsappStatus": "Estado de WhatsApp",
+    "connected": "Conectado",
+    "disconnected": "Desconectado",
+    "editSelectedGroups": "Editar Grupos Seleccionados",
+    "hideGroupsEditor": "Ocultar Editor de Grupos",
+    "connectionStatus": "Estado de Conexión",
+    "disconnect": {
+      "title": "Desconectar WhatsApp",
+      "description": "Esto desconectará tu sesión de WhatsApp. Necesitarás escanear el código QR nuevamente para reconectarte.",
+      "confirmationLabel": "Escribe 'DESCONECTAR' para confirmar",
+      "confirmationPlaceholder": "Escribe DESCONECTAR aquí",
+      "confirmationError": "Por favor escribe 'DESCONECTAR' exactamente para confirmar",
+      "button": "Desconectar"
+    },
+    "resetEverything": {
+      "title": "Reiniciar Todo",
+      "description": "Esta acción reiniciará todas las conexiones de WhatsApp, mensajes y configuraciones. Esto no se puede deshacer.",
+      "confirmationLabel": "Escribe 'REINICIAR TODO' para confirmar",
+      "confirmationPlaceholder": "Escribe REINICIAR TODO aquí",
+      "confirmationError": "Por favor escribe 'REINICIAR TODO' exactamente para confirmar",
+      "button": "Sí, Reiniciar Todo"
+    }
+  },
+  "home": {
+    "welcome": "Bienvenido al Panel de IA de Compass & Coin",
+    "subtitle": "Tu Asistente Inteligente de Bienes Raíces",
+    "description": "Optimiza tus operaciones inmobiliarias con nuestra plataforma avanzada impulsada por IA. Conecta WhatsApp, gestiona prospectos y automatiza tu flujo de trabajo con insights inteligentes.",
+    "getStarted": "Accede a tu panel de IA para comenzar a gestionar tus operaciones inmobiliarias",
+    "accessDashboard": "Acceder al Panel",
+    "learnMore": "Saber Más",
+    "features": {
+      "whatsapp": "Integración WhatsApp",
+      "whatsappDesc": "Conecta y gestiona conversaciones de WhatsApp sin problemas",
+      "automation": "Automatización Inteligente",
+      "automationDesc": "Automatiza el procesamiento de prospectos e interacciones con clientes",
+      "analytics": "Análisis en Tiempo Real",
+      "analyticsDesc": "Obtén insights sobre el rendimiento de tu negocio"
+    },
+    "toasts": {
+      "deploymentStarted": {
+        "title": "Despliegue iniciado",
+        "description": "Tu aplicación se está desplegando en Vercel."
+      },
+      "documentation": {
+        "title": "Documentación",
+        "description": "Abriendo la documentación de Next.js en una nueva pestaña."
+      },
+      "learningResources": {
+        "title": "Recursos de aprendizaje",
+        "description": "Abriendo los recursos de aprendizaje de Next.js en una nueva pestaña."
+      },
+      "examples": {
+        "title": "Ejemplos",
+        "description": "Abriendo los ejemplos de Next.js en una nueva pestaña."
+      },
+      "nextjsWebsite": {
+        "title": "Sitio web de Next.js",
+        "description": "Abriendo nextjs.org en una nueva pestaña."
+      }
+    }
+  },
+  "admin": {
+    "title": "Gestión de Usuarios",
+    "description": "Administrar usuarios, roles y permisos",
+    "createUser": "Crear Usuario",
+    "createUserDescription": "Agregar un nuevo usuario al sistema",
+    "userList": "Lista de Usuarios",
+    "userListDescription": "Administrar usuarios existentes y sus permisos",
+    "name": "Nombre",
+    "email": "Correo Electrónico",
+    "password": "Contraseña",
+    "role": "Rol",
+    "status": "Estado",
+    "actions": "Acciones",
+    "roleUser": "Usuario",
+    "roleAdmin": "Administrador",
+    "active": "Activo",
+    "inactive": "Inactivo",
+    "noName": "Sin Nombre",
+    "noUsers": "No se encontraron usuarios",
+    "changePassword": "Cambiar Contraseña",
+    "changePasswordDescription": "Ingresa una nueva contraseña para este usuario",
+    "editUser": "Editar Usuario",
+    "editUserDescription": "Modificar información del usuario y rol",
+    "newPassword": "Nueva Contraseña",
+    "confirmPassword": "Confirmar Contraseña",
+    "updatePassword": "Actualizar Contraseña",
+    "updateUser": "Actualizar Usuario",
+    "updateUserDescription": "Actualizar información del usuario y rol",
+    "delete": "Eliminar",
+    "cancel": "Cancelar",
+    "success": "Éxito",
+    "error": "Error",
+    "fillAllFields": "Por favor completa todos los campos requeridos",
+    "passwordsDoNotMatch": "Las contraseñas no coinciden",
+    "fetchUsersError": "Error al obtener usuarios",
+    "userCreatedSuccess": "Usuario creado exitosamente",
+    "createUserError": "Error al crear usuario",
+    "passwordUpdatedSuccess": "Contraseña actualizada exitosamente",
+    "updatePasswordError": "Error al actualizar contraseña",
+    "userDeletedSuccess": "Usuario eliminado exitosamente",
+    "deleteUserError": "Error al eliminar usuario",
+    "deleteUserConfirm": "¿Estás seguro de que quieres eliminar al usuario '{name}'? Esta acción no se puede deshacer.",
+    "userUpdatedSuccess": "Usuario actualizado exitosamente",
+    "updateUserError": "Error al actualizar usuario"
+  }
+} 

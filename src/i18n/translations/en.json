@@ -1,0 +1,148 @@
+{
+  "common": {
+    "appName": "Compass & Coin",
+    "gettingStarted": "Getting Started",
+    "learnNextjs": "Learn Next.js",
+    "learnNextjsDescription": "Learn about Next.js in an interactive course.",
+    "templates": "Templates",
+    "templatesDescription": "Explore the Next.js template collection.",
+    "documentation": "Documentation",
+    "documentationDescription": "Learn about Next.js features and API."
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "userAvatar": "User avatar"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "toggleTheme": "Toggle theme"
+  },
+  "language": {
+    "en": "English",
+    "es": "Spanish",
+    "fr": "French",
+    "switchLanguage": "Switch language"
+  },
+  "whatsapp": {
+    "googleSheetsTitle": "Google Sheets Integration",
+    "googleSheetsDescription": "Configure your Google Sheets document for data storage",
+    "googleSheetUrl": "Google Sheet URL",
+    "googleSheetUrlPlaceholder": "Paste your Google Sheets URL here or enter the Sheet ID",
+    "googleSheetUrlHelp": "You can paste the full Google Sheets URL or just the Sheet ID",
+    "openSheet": "Open Sheet",
+    "editUrl": "Edit URL",
+    "saveChanges": "Save Changes",
+    "cancel": "Cancel",
+    "notConfigured": "Not configured",
+    "invalidUrl": "Invalid Google Sheet URL or ID format",
+    "urlRequired": "Google Sheet URL or ID is required",
+    "whatsappStatus": "WhatsApp Status",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "editSelectedGroups": "Edit Selected Groups",
+    "hideGroupsEditor": "Hide Groups Editor",
+    "connectionStatus": "Connection Status",
+    "disconnect": {
+      "title": "Disconnect WhatsApp",
+      "description": "This will disconnect your WhatsApp session. You will need to scan the QR code again to reconnect.",
+      "confirmationLabel": "Type 'DISCONNECT' to confirm",
+      "confirmationPlaceholder": "Type DISCONNECT here",
+      "confirmationError": "Please type 'DISCONNECT' exactly to confirm",
+      "button": "Disconnect"
+    },
+    "resetEverything": {
+      "title": "Reset Everything",
+      "description": "This action will reset all WhatsApp connections, messages, and settings. This cannot be undone.",
+      "confirmationLabel": "Type 'RESET EVERYTHING' to confirm",
+      "confirmationPlaceholder": "Type RESET EVERYTHING here",
+      "confirmationError": "Please type 'RESET EVERYTHING' exactly to confirm",
+      "button": "Yes, Reset Everything"
+    }
+  },
+  "home": {
+    "welcome": "Welcome to Compass & Coin AI Panel",
+    "subtitle": "Your Intelligent Real Estate Assistant",
+    "description": "Streamline your real estate operations with our advanced AI-powered platform. Connect WhatsApp, manage leads, and automate your workflow with intelligent insights.",
+    "getStarted": "Access your AI dashboard to begin managing your real estate operations",
+    "accessDashboard": "Access Dashboard",
+    "learnMore": "Learn More",
+    "features": {
+      "whatsapp": "WhatsApp Integration",
+      "whatsappDesc": "Connect and manage WhatsApp conversations seamlessly",
+      "automation": "Smart Automation", 
+      "automationDesc": "Automate lead processing and customer interactions",
+      "analytics": "Real-time Analytics",
+      "analyticsDesc": "Get insights into your business performance"
+    },
+    "toasts": {
+      "deploymentStarted": {
+        "title": "Deployment Started",
+        "description": "Your application is being deployed to Vercel."
+      },
+      "documentation": {
+        "title": "Documentation",
+        "description": "Opening Next.js documentation in a new tab."
+      },
+      "learningResources": {
+        "title": "Learning Resources",
+        "description": "Opening Next.js learning resources in a new tab."
+      },
+      "examples": {
+        "title": "Examples",
+        "description": "Opening Next.js examples in a new tab."
+      },
+      "nextjsWebsite": {
+        "title": "Next.js Website",
+        "description": "Opening nextjs.org in a new tab."
+      }
+    }
+  },
+  "admin": {
+    "title": "User Management",
+    "description": "Manage users, roles, and permissions",
+    "createUser": "Create User",
+    "createUserDescription": "Add a new user to the system",
+    "userList": "Users List",
+    "userListDescription": "Manage existing users and their permissions",
+    "name": "Name",
+    "email": "Email",
+    "password": "Password",
+    "role": "Role",
+    "status": "Status",
+    "actions": "Actions",
+    "roleUser": "User",
+    "roleAdmin": "Admin",
+    "active": "Active",
+    "inactive": "Inactive",
+    "noName": "No Name",
+    "noUsers": "No users found",
+    "changePassword": "Change Password",
+    "changePasswordDescription": "Enter a new password for this user",
+    "editUser": "Edit User",
+    "editUserDescription": "Modify user information and role",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm Password",
+    "updatePassword": "Update Password",
+    "updateUser": "Update User",
+    "updateUserDescription": "Update user information and role",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "success": "Success",
+    "error": "Error",
+    "fillAllFields": "Please fill in all required fields",
+    "passwordsDoNotMatch": "Passwords do not match",
+    "fetchUsersError": "Failed to fetch users",
+    "userCreatedSuccess": "User created successfully",
+    "createUserError": "Failed to create user",
+    "passwordUpdatedSuccess": "Password updated successfully",
+    "updatePasswordError": "Failed to update password",
+    "userDeletedSuccess": "User deleted successfully",
+    "deleteUserError": "Failed to delete user",
+    "deleteUserConfirm": "Are you sure you want to delete user '{name}'? This action cannot be undone.",
+    "userUpdatedSuccess": "User updated successfully",
+    "updateUserError": "Failed to update user"
+  }
+} 

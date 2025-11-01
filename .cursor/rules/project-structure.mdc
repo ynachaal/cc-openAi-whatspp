@@ -1,0 +1,30 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Project Structure Guide
+
+This is a Next.js project using the App Router pattern. Here's the key structure:
+
+## Root Directory
+- `src/` - Contains all source code
+  - `app/` - Next.js App Router directory
+    - `page.tsx` - Main page component
+    - `layout.tsx` - Root layout component
+    - `globals.css` - Global styles
+- `public/` - Static assets
+- `package.json` - Project dependencies and scripts
+- `tsconfig.json` - TypeScript configuration
+- `next.config.ts` - Next.js configuration
+- `postcss.config.mjs` - PostCSS configuration
+- `eslint.config.mjs` - ESLint configuration
+
+## Key Files
+- [src/app/page.tsx](mdc:src/app/page.tsx) - The main page component
+- [src/app/layout.tsx](mdc:src/app/layout.tsx) - The root layout that wraps all pages
+- [src/app/globals.css](mdc:src/app/globals.css) - Global styles and Tailwind imports
+- [package.json](mdc:package.json) - Project dependencies and scripts
+- [next.config.ts](mdc:next.config.ts) - Next.js configuration
+
+

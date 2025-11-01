@@ -1,0 +1,31 @@
+# Google Sheets API Configuration Template
+# Copy this content to a .env file in the whatsapp-new-agent directory
+
+# Google Service Account Client Email
+# This should be the email address of your Google Service Account
+# Format: your-service-account@your-project-id.iam.gserviceaccount.com
+GOOGLE_CLIENT_EMAIL=your-service-account@your-project-id.iam.gserviceaccount.com
+
+# Google Service Account Private Key
+# This should be the private key from your Google Service Account JSON file
+# Make sure to include the full key including the BEGIN and END lines
+# Replace \n with actual newlines when you paste the key
+GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYOUR_PRIVATE_KEY_HERE\n-----END PRIVATE KEY-----\n"
+
+# Google Sheet ID (optional - can also be set in the admin panel)
+# This is the ID of your Google Spreadsheet
+# You can find this in the URL: https://docs.google.com/spreadsheets/d/SHEET_ID/edit
+GOOGLE_SHEET_ID=1aY1o_xt-kZRyHcUZJq16rkvKStNKFrkpqm7yWedAo8Y
+
+# Chrome executable path (optional - auto-detected if not set)
+# The agent will automatically find Chrome in Puppeteer cache or system installation
+# Only set this if you want to use a specific Chrome installation
+# Examples:
+# Windows: CHROME_PATH=C:\Users\YourUser\.cache\puppeteer\chrome\win64-140.0.7339.82\chrome-win64\chrome.exe
+# Linux: CHROME_PATH=/usr/bin/google-chrome
+# macOS: CHROME_PATH=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+CHROME_PATH=
+
+# Other environment variables (if needed)
+NODE_ENV=development
+PORT=3000
