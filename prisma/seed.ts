@@ -17,32 +17,14 @@ async function main() {
     },
   })
 
-  console.log('✅ Admin user created:', admin.email)
-
-  // Create API keys entry (use values from .env)
-  const apiKeys = await prisma.apiKeys.upsert({
-    where: { googleSheetId: process.env.GOOGLE_SHEET_ID || '' },
-    update: {
-      openaiKey: process.env.OPENAI_API_KEY,
-      googleClientEmail: process.env.GOOGLE_CLIENT_EMAIL,
-      googlePrivateKey: process.env.GOOGLE_PRIVATE_KEY,
-    },
-    create: {
-      googleSheetId: process.env.GOOGLE_SHEET_ID,
-      openaiKey: process.env.OPENAI_API_KEY,
-      googleClientEmail: process.env.GOOGLE_CLIENT_EMAIL,
-      googlePrivateKey: process.env.GOOGLE_PRIVATE_KEY,
-    },
-  })
-
-  console.log('✅ API keys created for sheet:', apiKeys.googleSheetId)
+  console.log({ admin })
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Seed failed:', e)
+    console.error(e)
     process.exit(1)
   })
   .finally(async () => {
     await prisma.$disconnect()
-  })
+  }) 

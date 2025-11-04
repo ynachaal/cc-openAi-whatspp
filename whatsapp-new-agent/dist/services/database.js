@@ -59,7 +59,6 @@ class DatabaseService {
     async getApiKeys() {
         try {
             console.log("Fetching API keys from database...");
-            console.log('CONFIG.NEXT_APP_URL:', constants_1.CONFIG.NEXT_APP_URL);
             const response = await axios_1.default.get(`${constants_1.CONFIG.NEXT_APP_URL}/api/api-keys`, {
                 headers: {
                     Authorization: constants_1.CONFIG.API_SECRET_KEY,

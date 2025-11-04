@@ -78,7 +78,6 @@ export class DatabaseService {
   async getApiKeys(): Promise<ApiKeys | null> {
     try {
       console.log("Fetching API keys from database...");
-    console.log('CONFIG.NEXT_APP_URL:', CONFIG.NEXT_APP_URL);
       const response = await axios.get(`${CONFIG.NEXT_APP_URL}/api/api-keys`, {
         headers: {
           Authorization: CONFIG.API_SECRET_KEY,
