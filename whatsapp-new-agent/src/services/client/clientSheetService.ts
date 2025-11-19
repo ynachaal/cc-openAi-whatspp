@@ -38,7 +38,8 @@ interface PendingMessage {
     sheetName: string;
     originalMessage: string | undefined;
     messageTimestamp: number | undefined;
-    resolve: (value: boolean) => void;
+      sheetRowIndex: number | undefined; // <-- explicitly include undefined
+      resolve: (rowIndex: number) => void; // <-- change from boolean to number
     reject: (error: any) => void;
 }
 
@@ -272,81 +273,102 @@ async function ensureHeaders(sheetName: string, forceUpdate: boolean = false) {
 
 // --- BATCHING CORE (RENAMED and Client-Specific) ---
 
-// Function to process batched messages
-async function processClientBatch(messages: PendingMessage[]) {
-    if (messages.length === 0) return;
+// --- PROCESS CLIENT BATCH ---
+export async function processClientBatch(messages: PendingMessage[]) {
+  if (messages.length === 0) return;
 
-    // Clear the timeout associated with the 'Client' sheet queue before processing
-    const timeoutId = batchTimeouts.get(CLIENT_SHEET_NAME);
-    if (timeoutId) {
-        clearTimeout(timeoutId);
-        batchTimeouts.delete(CLIENT_SHEET_NAME);
-    }
+  const timeoutId = batchTimeouts.get(CLIENT_SHEET_NAME);
+  if (timeoutId) {
+    clearTimeout(timeoutId);
+    batchTimeouts.delete(CLIENT_SHEET_NAME);
+  }
 
-    try {
-        const spreadsheetId = await getGoogleSheetId();
-        if (!auth || !sheets) { await initializeSheets(); }
-        await ensureHeaders(CLIENT_SHEET_NAME); // Ensure headers exist
+  try {
+    const spreadsheetId = await getGoogleSheetId();
+    if (!auth || !sheets) await initializeSheets();
+    await ensureHeaders(CLIENT_SHEET_NAME);
 
-        // Build batch data using the specific mapping function
-        const batchData: any[][] = messages.map(mapClientRowData);
+    const headers = getClientHeaders();
+    const endColumn = String.fromCharCode(65 + headers.length - 1);
 
-        // Calculate the range based on the number of columns from the headers
-        const headers = getClientHeaders();
-        const endColumn = String.fromCharCode(65 + headers.length - 1);
+    for (const msg of messages) {
+      const rowData = mapClientRowData(msg);
 
-        // Append batch data to sheet
-        await sheets.spreadsheets.values.append({
-            spreadsheetId,
-            range: `${CLIENT_SHEET_NAME}!A:${endColumn}`,
-            valueInputOption: 'USER_ENTERED',
-            requestBody: { values: batchData },
-        });
+      if (msg.sheetRowIndex) {
+        // ✅ Update existing row
+        const rowIndex = msg.sheetRowIndex;
+        const range = `${CLIENT_SHEET_NAME}!A${rowIndex}:${endColumn}${rowIndex}`;
+        await sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: { values: [rowData] },
+        });
+        msg.resolve(rowIndex);
+      } else {
+        // Append new row
+        const result = await sheets.spreadsheets.values.append({
+          spreadsheetId,
+          range: `${CLIENT_SHEET_NAME}!A:${endColumn}`,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: { values: [rowData] },
+        });
 
-        console.log(`📊 Batch processed: ${messages.length} messages sent to ${CLIENT_SHEET_NAME} sheet`);
-        messages.forEach(message => message.resolve(true));
-    } catch (error) {
-        console.error(`Error processing batch for ${CLIENT_SHEET_NAME}:`, error);
-        messages.forEach(message => message.reject(error));
-    }
+        // Get the new row index
+        const startRow = Number(result.data.updates?.updatedRange?.match(/\d+$/)?.[0]);
+        msg.resolve(startRow);
+      }
+    }
+
+    console.log(`📊 Batch processed: ${messages.length} messages sent to ${CLIENT_SHEET_NAME} sheet`);
+  } catch (error) {
+    console.error(`Error processing batch for ${CLIENT_SHEET_NAME}:`, error);
+    messages.forEach(msg => msg.reject(error));
+  }
 }
 
-// ⭐️ EXPORT ADDED: Function to add message to batch
-export function addToClientBatch(data: ClientRowData, userInfo: { phone: string; name: string }, originalMessage?: string, messageTimestamp?: number): Promise<boolean> {
-    return new Promise((resolve, reject) => {
-        const message: PendingMessage = {
-            data,
-            userInfo,
-            sheetName: CLIENT_SHEET_NAME, // Always hardcoded
-            originalMessage,
-            messageTimestamp,
-            resolve,
-            reject
-        };
+export function addToClientBatch(
+  data: ClientRowData,
+  userInfo: { phone: string; name: string },
+  originalMessage?: string,
+  messageTimestamp?: number,
+  sheetRowIndex?: number
+): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const message: PendingMessage = {
+      data,
+      userInfo,
+      sheetName: CLIENT_SHEET_NAME,
+      originalMessage,
+      messageTimestamp,
+      sheetRowIndex,  // optional existing row index for updates
+      resolve,
+      reject
+    };
 
-        // Add to pending messages for the Client sheet
-        if (!pendingMessages.has(CLIENT_SHEET_NAME)) {
-            pendingMessages.set(CLIENT_SHEET_NAME, []);
-        }
-        pendingMessages.get(CLIENT_SHEET_NAME)!.push(message);
+    if (!pendingMessages.has(CLIENT_SHEET_NAME)) {
+      pendingMessages.set(CLIENT_SHEET_NAME, []);
+    }
+    pendingMessages.get(CLIENT_SHEET_NAME)!.push(message);
 
-        const messages = pendingMessages.get(CLIENT_SHEET_NAME)!;
-        if (messages.length >= BATCH_SIZE) {
-            pendingMessages.set(CLIENT_SHEET_NAME, []);
-            processClientBatch(messages);
-        } else {
-            if (!batchTimeouts.has(CLIENT_SHEET_NAME)) {
-                const timeoutId = setTimeout(() => {
-                    const currentMessages = pendingMessages.get(CLIENT_SHEET_NAME);
-                    if (currentMessages && currentMessages.length > 0) {
-                        pendingMessages.set(CLIENT_SHEET_NAME, []);
-                        processClientBatch(currentMessages);
-                    }
-                }, BATCH_TIMEOUT);
-                batchTimeouts.set(CLIENT_SHEET_NAME, timeoutId);
-            }
-        }
-    });
+    const messages = pendingMessages.get(CLIENT_SHEET_NAME)!;
+
+    if (messages.length >= BATCH_SIZE) {
+      pendingMessages.set(CLIENT_SHEET_NAME, []);
+      processClientBatch(messages);
+    } else {
+      if (!batchTimeouts.has(CLIENT_SHEET_NAME)) {
+        const timeoutId = setTimeout(() => {
+          const currentMessages = pendingMessages.get(CLIENT_SHEET_NAME);
+          if (currentMessages && currentMessages.length > 0) {
+            pendingMessages.set(CLIENT_SHEET_NAME, []);
+            processClientBatch(currentMessages);
+          }
+        }, BATCH_TIMEOUT);
+        batchTimeouts.set(CLIENT_SHEET_NAME, timeoutId);
+      }
+    }
+  });
 }
 
 

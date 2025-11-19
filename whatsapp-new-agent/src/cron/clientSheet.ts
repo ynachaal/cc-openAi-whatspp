@@ -273,24 +273,25 @@ export async function processPropertyIdClientSync(): Promise<void> {
               latestSentiment, 
               latestFollowStatus
           );
-             const existingRowIndex = root.sheetRowIndex ?? undefined; // convert null → undefined
+
           // ⭐️ USE THE NEW CLIENT BATCH FUNCTION
-         const rowIndex = await addToClientBatch(
-    clientData, 
+        const rowIndex = await addToClientBatch(
+    clientData,
     { phone: rootAny.phone || '', name: rootAny.name || '' },
     root.message || undefined,
-    existingRowIndex
+     undefined,             // timestamp optional
+  root.sheetRowIndex || undefined,    // pass previous row index if exists
 );
 
           // Mark root as synced so we don't append it again
-          await prisma.clientMessage.update({
-    where: { id: root.id },
-    data: { 
-        sheetRowIndex: rowIndex,
-        sheetSynced: true,
-        needsSheetSync: false,
-        lastSheetSyncedAt: new Date()
-    },
+         await prisma.clientMessage.update({
+  where: { id: root.id },
+  data: { 
+    sheetSynced: true, 
+    needsSheetSync: false, 
+    lastSheetSyncedAt: new Date(),
+    sheetRowIndex: rowIndex  // optional: store the row number in DB
+  },
 });
 
         } catch (err) {
