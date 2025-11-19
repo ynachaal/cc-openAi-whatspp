@@ -1,7 +1,7 @@
 import axios from "axios";
 import { CONFIG } from "../config/constants";
 import { WhatsAppSession } from "../types/whatsapp";
-
+import { PrismaClient } from '@prisma/client';
 export interface ApiKeys {
   id?: string;
   googleSheetId?: string;
@@ -24,6 +24,7 @@ export class DatabaseService {
     return DatabaseService.instance;
   }
 
+  
   async updateWhatsAppSession(
     isLoggedIn?: boolean, 
     lastAnalyzedMessageDate?: Date,
@@ -129,4 +130,45 @@ export class DatabaseService {
       return false; // Default to not logged in if there's an error
     }
   }
+
+  async saveClientMessage(data: {
+  clientName: string,
+  number: string,
+  direction: 'incoming' | 'outgoing',
+  message: string,
+  timestamp: Date,
+  messageId?: string
+}) {
+  const prisma = new PrismaClient();
+  return prisma.clientMessage.create({ data });
+}
+async getClientNameByNumber(number: string) {
+  const prisma = new PrismaClient();
+  const message = await prisma.clientMessage.findFirst({
+    where: { number },
+    orderBy: { timestamp: 'desc' },
+    select: { clientName: true }
+  });
+  return message?.clientName || null;
+}
+async getLastThreeClientMessages(number: string) {
+  const prisma = new PrismaClient();
+  return prisma.clientMessage.findMany({
+    where: { number },
+    orderBy: { timestamp: 'desc' },
+    take: 3
+  });
+}
+
+async markMessageProcessed(id: string) {
+  const prisma = new PrismaClient();
+  return prisma.clientMessage.update({
+    where: { id },
+    data: { processed: true }
+  });
+}
+async getClientMessageByMessageId(messageId: string) {
+    const prisma = new PrismaClient();
+  return prisma.clientMessage.findUnique({ where: { messageId } });
+}
 }

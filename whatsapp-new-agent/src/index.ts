@@ -1,12 +1,15 @@
 // Load environment variables from .env file
 import dotenv from 'dotenv';
 dotenv.config();
+//import { processMessages } from './cron/aiMessageProcessor';
 
 import { Client, LocalAuth } from 'whatsapp-web.js';
 import qrcode from 'qrcode-terminal';
 import { MessageProcessor } from './services/messageProcessor';
 import { DatabaseService } from './services/database';
-
+//import './cron/clientSheet';   // <-- this runs the cron automatically
+//processMessages();
+import './cron/masterCron'; 
 interface WhatsAppAgentConfig {
   sessionName?: string;
   headless?: boolean;
@@ -14,6 +17,8 @@ interface WhatsAppAgentConfig {
 }
 
 class WhatsAppAgent {
+  private scanTimer: NodeJS.Timeout | null = null;
+  private readonly SCAN_INTERVAL = 5000; // 5 minutes
   private client: Client | null = null;
   private config: WhatsAppAgentConfig;
   private isAuthenticated: boolean = false;
@@ -27,7 +32,28 @@ class WhatsAppAgent {
   private whatsappNumbers: string[] = [];
   private refreshTimer: NodeJS.Timeout | null = null;
   private readonly REFRESH_INTERVAL = 60 * 60 * 1000; // 1 hour in milliseconds
+  private startScanTimer(): void {
+    if (this.scanTimer) {
+      clearInterval(this.scanTimer);
+    }
 
+    console.log('⏰ Starting scan timer for new WhatsApp messages (every 5 minutes)');
+    this.scanTimer = setInterval(async () => {
+      try {
+        await this.scanAndInsertNewMessages();
+      } catch (error) {
+        console.error('❌ Error during periodic message scan:', error);
+      }
+    }, this.SCAN_INTERVAL);
+  }
+
+  private clearScanTimer(): void {
+    if (this.scanTimer) {
+      console.log('🛑 Clearing scan timer');
+      clearInterval(this.scanTimer);
+      this.scanTimer = null;
+    }
+  }
   constructor(config: WhatsAppAgentConfig = {}) {
     this.config = {
       sessionName: 'whatsapp-new-agent',
@@ -59,11 +85,11 @@ class WhatsAppAgent {
             '--disable-gpu'
           ]
         };
-        
+
         if (chromePath) {
           config.executablePath = chromePath;
         }
-        
+
         return config;
       })()
     });
@@ -80,11 +106,11 @@ class WhatsAppAgent {
     // Try to find installed Chrome in Puppeteer cache
     const platform = process.platform;
     const homeDir = process.env['HOME'] || process.env['USERPROFILE'];
-    
+
     if (!homeDir) return undefined;
 
     let chromePath: string;
-    
+
     switch (platform) {
       case 'win32':
         chromePath = `${homeDir}\\.cache\\puppeteer\\chrome\\win64-140.0.7339.82\\chrome-win64\\chrome.exe`;
@@ -117,20 +143,142 @@ class WhatsAppAgent {
   private getCurrentWhatsAppNumbers(): string[] {
     return this.whatsappNumbers;
   }
+  public async scanAndInsertNewMessages(): Promise<void> {
+    console.log('⚠️ scanAndInsertNewMessages');
+
+    if (!this.isReady || !this.isAuthenticated) {
+      console.log('⚠️ WhatsApp client not ready, skipping scan');
+      return;
+    }
+
+    try {
+      const chats = await this.getChats();
+      const currentNumbers = this.getCurrentWhatsAppNumbers(); // your admin numbers
+      if (!currentNumbers.length) {
+        console.log('⚠️ No WhatsApp numbers configured, skipping scan');
+        return;
+      }
+
+      // Helper to clean number
+      function clean(id: string | undefined) {
+        return (id ?? "").replace(/@.+$/, "");
+      }
+
+      let totalInserted = 0;
+
+      for (const chat of chats) {
+
+        // --- 1️⃣ Skip GROUPS & BROADCASTS ---
+        if (chat.isGroup || chat.id.server === "g.us") continue;
+        if (chat.id.server === "broadcast") continue;
+
+        // --- 2️⃣ Only chats related to your admin numbers ---
+        const chatNumber = clean(chat.id._serialized);
+
+        const isRelevantChat = currentNumbers.some(num =>
+          chatNumber.endsWith(clean(num))
+        );
+
+        if (!isRelevantChat) continue;
+
+        // --- 3️⃣ Fetch last messages ---
+        const messages = await chat.fetchMessages({ limit: 100 });
+
+        for (const message of messages) {
+          const messageDate = new Date(message.timestamp * 1000);
+
+          if (!message.body || message.body.trim() === "") continue;
+
+          // Skip duplicates
+          const existing = await this.databaseService.getClientMessageByMessageId(
+            message.id._serialized
+          );
+          if (existing) continue;
+
+          // Determine direction
+          const isIncoming = message.from
+            ? !currentNumbers.some(num => clean(message.from!) === clean(num))
+            : false;
+          const direction = isIncoming ? "incoming" : "outgoing";
+
+          console.log(`📨 New ${direction} message from ${message.from} at ${messageDate.toISOString()}: "${message.body.substring(0, 50)}..."`);
+          // --- 4️⃣ Extract client/admin name ---
+          const contact = await message.getContact();
+
+          let clientName = "";
+          if (isIncoming) {
+            // Incoming → contact is client
+
+            clientName =
+              contact?.name ||
+              contact?.notifyName ||
+              chat.name ||
+              chat.contact?.pushname ||
+              chat.contact?.name ||
+              chat.contact?.notifyName ||
+              "";
+            console.log("==== Debug Contact Fields ====");
+            console.log("contact.pushname:", contact?.pushname);
+            console.log("contact.name:", contact?.name);
+            console.log("contact.notifyName:", contact?.notifyName);
+            console.log("chat.name:", chat.name);
+            console.log("chat.contact.pushname:", chat.contact?.pushname);
+            console.log("chat.contact.name:", chat.contact?.name);
+            console.log("chat.contact.notifyName:", chat.contact?.notifyName);
+            console.log("message.from:", message.from);
+            console.log("message.to:", message.to);
+            console.log("isIncoming:", isIncoming);
+            console.log("==============================");
+          } else {
+            // Outgoing → message.getContact() is YOU (admin)
+            // So use chat.contact to get client
+            clientName =
+              chat.name ||
+              chat.contact?.pushname ||
+              chat.contact?.name ||
+              chat.contact?.notifyName ||
+              "";
+          }
+
+          console.log(`Extracted client name: ${clientName}`);
+
+          // --- 5️⃣ Only save if CLT name appears (Incoming or Outgoing) ---
+          if (!clientName.toLowerCase().includes("clt")) continue;
+          console.log(`message.to`, message.to);
+          console.log(`message.from`, message.from);
+          // Save message
+          await this.databaseService.saveClientMessage({
+            clientName,
+            number: isIncoming ? message.from : message.from,
+            direction,
+            message: message.body,
+            timestamp: messageDate,
+            messageId: message.id._serialized,
+          });
+
+          totalInserted++;
+        }
+      }
+
+      console.log(`✅ Scan complete. Inserted ${totalInserted} new messages.`);
+    } catch (error) {
+      console.error("❌ Error scanning and inserting messages:", error);
+    }
+  }
 
   private setupEventHandlers(): void {
     this.client?.on('qr', (qr: string) => {
-      qrcode.generate(qr, {small: true},(renderedQrCode)=>{
+      qrcode.generate(qr, { small: true }, (renderedQrCode) => {
         console.log('QR Code rendered:', renderedQrCode);
-        
+
         // Use arrow function to access current qrCodeCallbacks array
         const getCurrentQRCallbacks = () => this.qrCodeCallbacks;
         const currentCallbacks = getCurrentQRCallbacks();
-        
+
         // Notify all QR code callbacks with both raw QR and rendered QR
         currentCallbacks.forEach(callback => callback(qr, renderedQrCode));
         console.log('QR Code callbacks notified:', renderedQrCode, currentCallbacks);
-        
+
       });
       console.log('QR Code received:', qr);
     });
@@ -138,7 +286,7 @@ class WhatsAppAgent {
     this.client?.on('ready', async () => {
       console.log('WhatsApp client is ready!');
       this.isReady = true;
-      
+      this.startRefreshTimer();
       // Update database with authentication status
       try {
         await this.databaseService.updateWhatsAppSession(true);
@@ -146,18 +294,18 @@ class WhatsAppAgent {
       } catch (error) {
         console.error('❌ Failed to update database authentication status:', error);
       }
-      
+
       // Load WhatsApp numbers from database
       await this.loadWhatsAppNumbers();
-      
+
       // Start the refresh timer
       this.startRefreshTimer();
-      
+      this.startScanTimer(); // << ADD THIS
       // Scan for missed messages after a short delay to ensure everything is ready
       setTimeout(async () => {
         await this.scanForMissedMessages();
       }, 3000); // Wait 3 seconds before scanning
-      
+
       this.notifyStatusChange();
     });
 
@@ -171,7 +319,7 @@ class WhatsAppAgent {
       console.error('Authentication failed:', msg);
       this.isAuthenticated = false;
       this.isReady = false;
-      
+
       // Update database with authentication failure
       try {
         await this.databaseService.updateWhatsAppSession(false);
@@ -179,7 +327,7 @@ class WhatsAppAgent {
       } catch (error) {
         console.error('❌ Failed to update database authentication status:', error);
       }
-      
+
       this.notifyStatusChange();
     });
 
@@ -187,7 +335,7 @@ class WhatsAppAgent {
       console.log('📨 Message received:', message.body);
       try {
         // Use arrow function to access current whatsappNumbers value
-        
+
         // Check if we have WhatsApp numbers configured
         const currentNumbers = this.getCurrentWhatsAppNumbers();
         if (currentNumbers.length === 0) {
@@ -223,7 +371,7 @@ class WhatsAppAgent {
 
         // Process the message automatically
         const processingResult = await this.messageProcessor.processMessage(message, messageFrom);
-        
+
         // Update database with last processed message info if processing was successful
         if (processingResult) {
           try {
@@ -238,7 +386,7 @@ class WhatsAppAgent {
             console.error('❌ Failed to update database with processed message info:', error);
           }
         }
-        
+
         // Notify callbacks about processing result
         this.messageCallbacks.forEach(callback => {
           callback({
@@ -261,10 +409,11 @@ class WhatsAppAgent {
       console.log('WhatsApp client was disconnected:', reason);
       this.isAuthenticated = false;
       this.isReady = false;
-      
+
       // Clear the refresh timer
       this.clearRefreshTimer();
-      
+      this.clearScanTimer(); // << ADD THIS
+
       // Update database with disconnection status
       try {
         await this.databaseService.updateWhatsAppSession(false);
@@ -272,14 +421,14 @@ class WhatsAppAgent {
       } catch (error) {
         console.error('❌ Failed to update database authentication status:', error);
       }
-      
+
       this.notifyStatusChange();
     });
   }
 
-    getCurrentStatusCallbacks = () => this.statusCallbacks;
+  getCurrentStatusCallbacks = () => this.statusCallbacks;
 
-    private notifyStatusChange(): void {
+  private notifyStatusChange(): void {
     const status = {
       authenticated: this.isAuthenticated,
       ready: this.isReady
@@ -313,12 +462,12 @@ class WhatsAppAgent {
     try {
       console.log('🔄 Loading WhatsApp numbers from database...');
       const session = await this.databaseService.getWhatsAppSession();
-      
+
       if (session.activeListeningGroups) {
         this.whatsappNumbers = Array.isArray(session.activeListeningGroups)
           ? session.activeListeningGroups
           : JSON.parse(session.activeListeningGroups);
-        
+
         console.log(`✅ Loaded ${this.whatsappNumbers.length} WhatsApp numbers:`, this.whatsappNumbers);
       } else {
         this.whatsappNumbers = [];
@@ -376,7 +525,7 @@ class WhatsAppAgent {
       }
 
       console.log('🔍 Starting scan for missed messages...');
-      
+
       // Get the last processed message info from database
       const session = await this.databaseService.getWhatsAppSession();
       const lastAnalyzedDate = session.lastAnalyzedMessageDate ? new Date(session.lastAnalyzedMessageDate) : null;
@@ -423,7 +572,7 @@ class WhatsAppAgent {
           // Process messages that are newer than last analyzed date
           for (const message of messages) {
             const messageDate = new Date(message.timestamp * 1000);
-            
+
             // Skip if message is older than or equal to last analyzed date
             if (messageDate <= lastAnalyzedDate) {
               continue;
@@ -438,7 +587,7 @@ class WhatsAppAgent {
 
             // Process the historical message
             const processingResult = await this.messageProcessor.processHistoricalMessage(message, lastAnalyzedDate);
-            
+
             if (processingResult) {
               if (processingResult.timestamp > latestProcessedTimestamp) {
                 latestProcessedTimestamp = processingResult.timestamp;
@@ -476,7 +625,7 @@ class WhatsAppAgent {
     if (this.refreshTimer) {
       this.clearRefreshTimer();
     }
-    
+
     console.log('⏰ Starting WhatsApp page refresh timer (1 hour interval)');
     this.refreshTimer = setInterval(async () => {
       if (this.isReady && this.isAuthenticated) {
@@ -499,13 +648,13 @@ class WhatsAppAgent {
     try {
       // Check authentication status from database first
       const isLoggedIn = await this.databaseService.checkAuthenticationStatus();
-      
+
       if (!isLoggedIn) {
         console.log('🔒 User is not logged in according to database. WhatsApp initialization skipped.');
         console.log('💡 Send a "login" message via WebSocket to initialize WhatsApp.');
         return;
       }
-      
+
       console.log('✅ User is logged in according to database. Proceeding with WhatsApp initialization...');
       await this.client?.initialize();
       this.isInitialized = true;
@@ -519,7 +668,7 @@ class WhatsAppAgent {
   public async forceInitialize(): Promise<void> {
     try {
       console.log('🚀 Force initializing WhatsApp agent (bypassing database check)...');
-      
+
       // If client is already initialized, destroy it first to force new QR code generation
       if (this.isInitialized || this.isReady || this.isAuthenticated) {
         console.log('🔄 Client already initialized, destroying first to generate new QR code...');
@@ -529,12 +678,12 @@ class WhatsAppAgent {
         } catch (destroyError) {
           console.log('⚠️ Error destroying client (might not be initialized):', destroyError);
         }
-        
+
         // Reset states
         this.isInitialized = false;
         this.isReady = false;
         this.isAuthenticated = false;
-        
+
         // Create new client instance
         this.client = new Client({
           authStrategy: new LocalAuth({
@@ -555,19 +704,19 @@ class WhatsAppAgent {
                 '--disable-gpu'
               ]
             };
-            
+
             if (chromePath) {
               config.executablePath = chromePath;
             }
-            
+
             return config;
           })()
         });
-        
+
         // Re-setup event handlers for the new client
         this.setupEventHandlers();
       }
-      
+
       await this.client?.initialize();
       this.isInitialized = true;
       console.log('WhatsApp agent force initialized successfully');
@@ -590,7 +739,7 @@ class WhatsAppAgent {
 
   public async getChats(): Promise<any[]> {
     try {
-      return await this.client?.getChats() || []        ;
+      return await this.client?.getChats() || [];
     } catch (error) {
       console.error('Failed to get chats:', error);
       throw error;
@@ -609,7 +758,7 @@ class WhatsAppAgent {
     try {
       // Clear the refresh timer
       this.clearRefreshTimer();
-      
+
       await this.client?.logout();
       await this.client?.pupBrowser?.close();
       await this.client?.destroy();
@@ -633,7 +782,7 @@ if (require.main === module) {
   // Start the WebSocket server
   const { WhatsAppNewAgentApp } = require('./app');
   const app = WhatsAppNewAgentApp.getInstance();
-  
+
   app.start();
 
   // Graceful shutdown

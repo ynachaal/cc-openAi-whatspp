@@ -5,6 +5,7 @@ import { formatDubaiTime } from '../utils/dubaiTime';
 // Global variables that can be updated
 let sheets: any = null;
 
+
 // Cache for API keys, sheet fields, and sheet metadata to reduce API calls
 interface CacheEntry<T> {
     data: T;
@@ -46,13 +47,13 @@ async function initializeGoogleAuth() {
     try {
         // Check cache first
         let apiKeys = getCachedApiKeys();
-        
+
         if (!apiKeys) {
-        const databaseService = DatabaseService.getInstance();
+            const databaseService = DatabaseService.getInstance();
             apiKeys = await databaseService.getApiKeys();
             setCachedApiKeys(apiKeys);
         }
-        
+
         if (apiKeys?.googleClientEmail && apiKeys?.googlePrivateKey) {
             console.log("Using Google credentials from database");
             auth = new google.auth.GoogleAuth({
@@ -98,8 +99,6 @@ initializeSheets().then(async () => {
     }
 }).catch(console.error);
 
-// Note: Removed sheetQueue as we now use batching for better performance
-
 // Batch processing for multiple messages
 interface PendingMessage {
     data: any;
@@ -114,20 +113,28 @@ interface PendingMessage {
 const pendingMessages = new Map<string, PendingMessage[]>();
 const BATCH_TIMEOUT = 2000; // 2 seconds
 const BATCH_SIZE = 10; // Maximum batch size
+const batchTimeouts = new Map<string, NodeJS.Timeout>(); // Stores timeout IDs
+
 
 // Function to process batched messages
 async function processBatch(sheetName: string, messages: PendingMessage[]) {
+
     if (messages.length === 0) return;
+
+    // Clear the timeout associated with this sheet queue before processing
+    const timeoutId = batchTimeouts.get(sheetName);
+    if (timeoutId) {
+        clearTimeout(timeoutId);
+        batchTimeouts.delete(sheetName);
+    }
 
     try {
         const spreadsheetId = await getGoogleSheetId();
-        
+
         // Ensure auth and sheets are initialized
         if (!auth || !sheets) {
             await initializeSheets();
         }
-
-        // Note: Headers are no longer automatically synced - use sync_sheet_columns WebSocket message
 
         // Get dynamic fields from database to build row data (use cache)
         let fields = getCachedSheetFields();
@@ -139,20 +146,21 @@ async function processBatch(sheetName: string, messages: PendingMessage[]) {
 
         // Build batch data
         const batchData: any[][] = [];
-        
+
         for (const message of messages) {
+
             const rowData = [
                 message.userInfo.phone || '',
                 message.userInfo.name || '',
                 message.originalMessage || ''
             ];
-            
+
             if (fields && fields.length > 0) {
                 // Sort fields by order and add their values
                 const sortedFields = fields.sort((a, b) => a.order - b.order);
                 sortedFields.forEach(field => {
                     let value = message.data[field.fieldName] || '';
-                    
+
                     // Handle special formatting for different field types
                     if (field.fieldType === 'array' && Array.isArray(value)) {
                         value = value.join(', ');
@@ -166,17 +174,17 @@ async function processBatch(sheetName: string, messages: PendingMessage[]) {
                             // Keep original value if date parsing fails
                         }
                     }
-                    
+
                     rowData.push(value);
                 });
-                
+
                 // Ensure timestamp is at position 15 (index 14)
                 // If we have less than 14 columns, pad with empty strings
                 while (rowData.length < 14) {
                     rowData.push('');
                 }
-                // Add timestamp at position 15 (index 14) - use message timestamp in Dubai time
                 const timestamp = message.messageTimestamp ? formatDubaiTime(message.messageTimestamp) : formatDubaiTime(Date.now());
+                // Add timestamp at position 15 (index 14) - use message timestamp in Dubai time
                 if (rowData.length === 14) {
                     rowData.push(timestamp);
                 } else {
@@ -217,7 +225,7 @@ async function processBatch(sheetName: string, messages: PendingMessage[]) {
 
         // Calculate the range based on the number of columns
         const endColumn = String.fromCharCode(65 + (batchData[0]?.length || 0) - 1);
-        
+
         // Append batch data to sheet
         await sheets.spreadsheets.values.append({
             spreadsheetId,
@@ -239,8 +247,8 @@ async function processBatch(sheetName: string, messages: PendingMessage[]) {
     }
 }
 
-// Function to add message to batch
-function addToBatch(data: any, userInfo: { phone: string; name: string }, sheetName: string, originalMessage?: string, messageTimestamp?: number): Promise<boolean> {
+// Function to add message to batch (updated to use single timer per sheet)
+export function addToBatch(data: any, userInfo: { phone: string; name: string }, sheetName: string, originalMessage?: string, messageTimestamp?: number): Promise<boolean> {
     return new Promise((resolve, reject) => {
         const message: PendingMessage = {
             data,
@@ -262,28 +270,35 @@ function addToBatch(data: any, userInfo: { phone: string; name: string }, sheetN
         const messages = pendingMessages.get(sheetName)!;
         if (messages.length >= BATCH_SIZE) {
             // Process immediately if batch is full
-            pendingMessages.set(sheetName, []);
+            pendingMessages.set(sheetName, []); // Clear before processing to avoid race condition with timeout
             processBatch(sheetName, messages);
         } else {
-            // Set timeout to process batch after delay
-            setTimeout(() => {
-                const currentMessages = pendingMessages.get(sheetName);
-                if (currentMessages && currentMessages.length > 0) {
-                    pendingMessages.set(sheetName, []);
-                    processBatch(sheetName, currentMessages);
-                }
-            }, BATCH_TIMEOUT);
+            // If a timer is not running, start one.
+            if (!batchTimeouts.has(sheetName)) {
+                const timeoutId = setTimeout(() => {
+                    const currentMessages = pendingMessages.get(sheetName);
+                    if (currentMessages && currentMessages.length > 0) {
+                        pendingMessages.set(sheetName, []); // Clear before processing
+                        processBatch(sheetName, currentMessages);
+                    }
+                }, BATCH_TIMEOUT);
+
+                batchTimeouts.set(sheetName, timeoutId); // Store the new timer ID
+            }
         }
     });
 }
 
-// Function to clear cache (useful for testing or when configuration changes)
+// Function to clear cache (updated to clear batchTimeouts)
 export function clearCache() {
     console.log("🧹 Clearing Google Sheets cache");
     apiKeysCache = null;
     sheetFieldsCache = null;
     sheetCache.clear();
     pendingMessages.clear();
+    // NEW: Clear all pending timeouts
+    Array.from(batchTimeouts.values()).forEach(clearTimeout);
+    batchTimeouts.clear();
 }
 
 // Function to get cache status (useful for debugging)
@@ -308,14 +323,14 @@ export function getCacheStatus() {
 export async function syncAllSheetHeaders(): Promise<{ sheetsUpdated: number; totalSheets: number }> {
     const sheetNames = Object.values(SHEET_NAMES);
     let sheetsUpdated = 0;
-    
+
     console.log(`🔄 Starting sync of ${sheetNames.length} sheet headers...`);
-    
+
     // Ensure Google Sheets is initialized
     if (!auth || !sheets) {
         await initializeSheets();
     }
-    
+
     for (const sheetName of sheetNames) {
         try {
             // Force ensure sheet exists and headers are updated
@@ -327,7 +342,7 @@ export async function syncAllSheetHeaders(): Promise<{ sheetsUpdated: number; to
             console.error(`❌ Failed to sync headers for ${sheetName}:`, error);
         }
     }
-    
+
     console.log(`📊 Header sync completed: ${sheetsUpdated}/${sheetNames.length} sheets updated`);
     return {
         sheetsUpdated,
@@ -339,13 +354,13 @@ export async function syncAllSheetHeaders(): Promise<{ sheetsUpdated: number; to
 export async function initializeSheetsWithSync(): Promise<void> {
     try {
         console.log("🚀 Initializing Google Sheets with automatic header sync...");
-        
+
         // Initialize Google Sheets
         await initializeSheets();
-        
+
         // Sync all sheet headers
         const result = await syncAllSheetHeaders();
-        
+
         console.log(`✅ Google Sheets initialized and synced: ${result.sheetsUpdated}/${result.totalSheets} sheets ready`);
     } catch (error) {
         console.error("❌ Failed to initialize Google Sheets with sync:", error);
@@ -356,31 +371,60 @@ export async function initializeSheetsWithSync(): Promise<void> {
 // Sheet names for different transaction types
 const SHEET_NAMES = {
     BUY: 'Buy_Properties',
-    SELL: 'Sell_Properties', 
+    SELL: 'Sell_Properties',
     RENT: 'Rent_Properties',
-    GENERAL: 'General_Messages'
+    GENERAL: 'General_Messages',
+    CLIENT: 'Client', // <-- NEW SHEET NAME
 };
 
-// Function to get dynamic headers from database
-async function getDynamicHeaders(): Promise<string[]> {
+
+// Function to get dynamic headers from database (updated for Client sheet)
+async function getDynamicHeaders(sheetName: string): Promise<string[]> {
+
+    // --- NEW/UPDATED: LOGIC FOR 'Client' SHEET ---
+    if (sheetName === SHEET_NAMES.CLIENT) {
+        console.log("Using specific headers for Client sheet.");
+
+        // Total of 15 unique headers, followed by 'Timestamp' at position 16 (index 15)
+        const clientHeaders = [
+            'Date',
+            'Customer Sequence - Last', // CLT393
+            'Middle', // RESL
+            'Classification', // Residential Client - Lease'
+            'Name',
+            'Mobile 1',
+            'Budget',
+            'Preferred Size',
+            'Preferred Area',
+            'Status',
+            'Individual Name',
+            'Remarks',
+            'Follow Up Status'
+        ];
+
+       
+        return clientHeaders;
+    }
+    // --- END: LOGIC FOR 'CLIENT' SHEET ---
+
     try {
         // Check cache first
         let fields = getCachedSheetFields();
-        
+
         if (!fields) {
-        const databaseService = DatabaseService.getInstance();
+            const databaseService = DatabaseService.getInstance();
             fields = await databaseService.getSheetFields();
             setCachedSheetFields(fields);
         }
-        
+
         if (fields && fields.length > 0) {
             // Start with system headers
             const headers = [
                 'User Phone',
-                'User Name', 
+                'User Name',
                 'Original Message'
             ];
-            
+
             // Add dynamic fields from database (sorted by order)
             const sortedFields = fields.sort((a, b) => a.order - b.order);
             sortedFields.forEach(field => {
@@ -390,7 +434,7 @@ async function getDynamicHeaders(): Promise<string[]> {
                     .replace(/\b\w/g, (l: string) => l.toUpperCase());
                 headers.push(headerName);
             });
-            
+
             // Ensure timestamp is at position 15 (index 14)
             // If we have less than 14 columns, pad with empty strings
             while (headers.length < 14) {
@@ -398,18 +442,18 @@ async function getDynamicHeaders(): Promise<string[]> {
             }
             // Add timestamp at position 15 (index 14)
             if (headers.length === 14) {
-            headers.push('Timestamp');
+                headers.push('Timestamp');
             } else {
                 // If we already have more than 14 columns, insert timestamp at position 15
                 headers.splice(14, 0, 'Timestamp');
             }
-            
+
             return headers;
         }
     } catch (error) {
         console.error("Error fetching dynamic headers:", error);
     }
-    
+
     // Fallback to static headers if database fields are not available
     console.log("Using fallback static headers");
     const fallbackHeaders = [
@@ -438,7 +482,7 @@ async function getDynamicHeaders(): Promise<string[]> {
         'Is Multi',
         'Message Type'
     ];
-    
+
     // Ensure timestamp is at position 15 (index 14)
     while (fallbackHeaders.length < 14) {
         fallbackHeaders.push('');
@@ -448,7 +492,7 @@ async function getDynamicHeaders(): Promise<string[]> {
     } else {
         fallbackHeaders.splice(14, 0, 'Timestamp');
     }
-    
+
     return fallbackHeaders;
 }
 
@@ -457,13 +501,13 @@ async function getGoogleSheetId(): Promise<string> {
     try {
         // Check cache first
         let apiKeys = getCachedApiKeys();
-        
+
         if (!apiKeys) {
-        const databaseService = DatabaseService.getInstance();
+            const databaseService = DatabaseService.getInstance();
             apiKeys = await databaseService.getApiKeys();
             setCachedApiKeys(apiKeys);
         }
-        
+
         if (apiKeys?.googleSheetId) {
             console.log("Using Google Sheet ID from database");
             return apiKeys.googleSheetId;
@@ -535,7 +579,7 @@ async function ensureSheetExists(sheetName: string) {
                 },
             });
             console.log(`Sheet ${sheetName} created successfully`);
-            
+
             // Update cache to reflect creation
             sheetCache.set(sheetName, {
                 exists: true,
@@ -557,22 +601,22 @@ export async function updateGoogleSheetId(sheetId: string) {
         console.warn("Google Sheet ID is empty");
         return;
     }
-    
+
     console.log("🔄 Google Sheet ID update requested:", sheetId);
-    
+
     try {
         // Clear cache to force fresh data
         clearCache();
-        
+
         // Re-initialize with new sheet ID
         await initializeSheets();
-        
+
         // Auto-sync all sheet headers with new sheet ID
         console.log("🔄 Auto-syncing sheet headers for new Google Sheet ID...");
         const result = await syncAllSheetHeaders();
-        
+
         console.log(`✅ Google Sheet ID updated and headers synced: ${result.sheetsUpdated}/${result.totalSheets} sheets updated`);
-        
+
         return {
             success: true,
             sheetsUpdated: result.sheetsUpdated,
@@ -613,7 +657,7 @@ async function ensureHeaders(sheetName: string, forceUpdate: boolean = false) {
         await ensureSheetExists(sheetName);
 
         // Get dynamic headers from database
-        const currentHeaders = await getDynamicHeaders();
+        const currentHeaders = await getDynamicHeaders(sheetName); // Passing sheetName here
         const headerRange = `${sheetName}!A1:${String.fromCharCode(65 + currentHeaders.length - 1)}1`;
 
         // Check if headers exist
@@ -625,7 +669,7 @@ async function ensureHeaders(sheetName: string, forceUpdate: boolean = false) {
         // If no headers exist or they're different, update them
         const existingHeaders = response.data.values?.[0] || [];
         const headersChanged = existingHeaders.join(',') !== currentHeaders.join(',');
-        
+
         if (!response.data.values || headersChanged) {
             await sheets.spreadsheets.values.update({
                 spreadsheetId,
@@ -649,8 +693,6 @@ async function ensureHeaders(sheetName: string, forceUpdate: boolean = false) {
         throw error;
     }
 }
-
-// Note: Removed appendToSheet function as we now use batching for better performance
 
 // Function to determine sheet name based on transaction type
 function getSheetNameForTransaction(transactionType: string): string {
@@ -691,12 +733,12 @@ async function processPropertyArray(dataArray: any[], userInfo: { phone: string;
 
     // Send each group to its respective sheet using batching
     const promises = [];
-    
+
     for (const [transactionType, items] of Object.entries(groupedData)) {
         if (items.length > 0) {
             const sheetName = getSheetNameForTransaction(transactionType);
             console.log(`📊 Batching ${items.length} ${transactionType} properties for ${sheetName} sheet`);
-            
+
             // Add each item to the batch
             for (const item of items) {
                 promises.push(
@@ -709,12 +751,26 @@ async function processPropertyArray(dataArray: any[], userInfo: { phone: string;
     // Wait for all operations to complete
     await Promise.all(promises);
 }
+// Assuming extractAnalysisFields is defined as:
+function extractAnalysisFields(data: any) {
+    const source = Array.isArray(data) && data.length > 0 ? data[0] : data;
+
+    return {
+        client_sentiment: source.client_sentiment || 'unknown',
+        client_intent: source.client_intent || 'unknown',
+        client_status: source.client_status || 'unknown',
+    };
+}
 
 export async function sendToGoogleSheet(data: any, userInfo: { phone: string; name: string }, originalMessage?: string, messageTimestamp?: number): Promise<boolean> {
+
+    console.log("📊 data:", data);
+    console.log("📊 originalMessage:", originalMessage);
     console.log("📊 sendToGoogleSheet called with userInfo:", userInfo);
     console.log("📊 Phone number:", userInfo.phone);
     console.log("📊 Name:", userInfo.name);
-    
+
+
     // Check if we can get a sheet ID
     try {
         await getGoogleSheetId(); // This will throw if no ID is available
@@ -722,6 +778,10 @@ export async function sendToGoogleSheet(data: any, userInfo: { phone: string; na
         console.warn("Google Sheet ID not configured, skipping sheet update");
         return false;
     }
+
+    // Extract the new conversation analysis fields
+    const analysisFields = extractAnalysisFields(data);
+    console.log("📊 Extracted analysis fields:", analysisFields);
 
     // Retry logic: up to 3 attempts
     const maxRetries = 3;
@@ -731,33 +791,46 @@ export async function sendToGoogleSheet(data: any, userInfo: { phone: string; na
             // Handle the new array format from the parser
             if (Array.isArray(data)) {
                 console.log(`📊 Processing ${data.length} property entries`);
-                await processPropertyArray(data, userInfo, originalMessage, messageTimestamp);
+
+                // Pass the analysis fields to processPropertyArray 
+                const dataWithAnalysis = data.map(property => ({
+                    ...property,
+                    ...analysisFields,
+                }));
+
+                // Assuming processPropertyArray handles batching for multiple properties
+                await processPropertyArray(dataWithAnalysis, userInfo, originalMessage, messageTimestamp);
             } else {
-                // Handle single object (backward compatibility) - use batching
-                console.log('📊 Processing single property entry');
-                const sheetName = getSheetNameForTransaction(data.transaction_type || 'buy');
-                await addToBatch(data, userInfo, sheetName, originalMessage, messageTimestamp);
+                
+                const sheetName = getSheetNameForTransaction(data.transaction_type || 'general');
+
+                // Merge analysis fields with the single data object
+                const combinedData = {
+                    ...data,
+                    ...analysisFields,
+                };
+
+                await addToBatch(combinedData, userInfo, sheetName, originalMessage, messageTimestamp);
             }
-            
+
             console.log('Data successfully sent to Google Sheets');
             return true;
         } catch (error) {
             attempt++;
             console.error(`Error sending data to Google Sheets (attempt ${attempt}):`, error);
-            
-            // Check if it's a rate limit error
-            if (error && typeof error === 'object' && 'code' in error && error.code === 429) {
-                console.log('🔄 Rate limit hit, waiting before retry...');
-                await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // Check if it's a rate limit error and wait before retrying
+            if (error && typeof error === 'object' && 'code' in error && (error as any).code === 429) {
+                const delay = Math.pow(2, attempt) * 1000; // Exponential backoff (2s, 4s, 8s)
+                console.log(`Rate limit hit (429). Waiting for ${delay / 1000} seconds before next attempt.`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            } else if (attempt < maxRetries) {
+                // Wait a moment for non-rate limit errors
+                await new Promise(resolve => setTimeout(resolve, 1000));
             }
-            
-            if (attempt >= maxRetries) {
-                throw error;
-            }
-            // Wait a bit before retrying
-            await new Promise(res => setTimeout(res, 2000 * attempt));
         }
     }
-    
-    return false; // This should never be reached, but TypeScript requires it
+
+    console.log("❌ Failed to send data to Google Sheets after max retries.");
+    return false;
 }
