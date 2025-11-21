@@ -17,6 +17,7 @@ interface WhatsAppAgentConfig {
 }
 
 class WhatsAppAgent {
+  private selfId: string | null = null; 
   private scanTimer: NodeJS.Timeout | null = null;
   private readonly SCAN_INTERVAL = 5000; // 5 minutes
   private client: Client | null = null;
@@ -143,129 +144,134 @@ class WhatsAppAgent {
   private getCurrentWhatsAppNumbers(): string[] {
     return this.whatsappNumbers;
   }
-  public async scanAndInsertNewMessages(): Promise<void> {
-    console.log('⚠️ scanAndInsertNewMessages');
+ public async scanAndInsertNewMessages(): Promise<void> {
+    console.log('⚠️ scanAndInsertNewMessages (Optimized for CLT)');
 
     if (!this.isReady || !this.isAuthenticated) {
-      console.log('⚠️ WhatsApp client not ready, skipping scan');
-      return;
+        console.log('⚠️ WhatsApp client not ready, skipping scan');
+        return;
     }
 
     try {
-      const chats = await this.getChats();
-      const currentNumbers = this.getCurrentWhatsAppNumbers(); // your admin numbers
-      if (!currentNumbers.length) {
-        console.log('⚠️ No WhatsApp numbers configured, skipping scan');
-        return;
-      }
+        const chats = await this.getChats();
+        // currentNumbers are commented out here, but will be needed if you use a 'clean' function
+        // for comparison outside of this.isOwnNumber, or if you re-enable the admin number chat filter.
+        
+        let totalInserted = 0;
 
-      // Helper to clean number
-      function clean(id: string | undefined) {
-        return (id ?? "").replace(/@.+$/, "");
-      }
+        for (const chat of chats) {
 
-      let totalInserted = 0;
+            // --- 1️⃣ Skip GROUPS & BROADCASTS ---
+            if (chat.isGroup || chat.id.server === "g.us") continue;
+            if (chat.id.server === "broadcast") continue;
 
-      for (const chat of chats) {
+            // --- 2️⃣ EFFICIENT FILTER: Only process chats where the name includes "clt" ---
+            // This checks the stored chat name BEFORE fetching potentially 100 messages.
+            const primaryChatName = chat.name || chat.contact?.name || "";
 
-        // --- 1️⃣ Skip GROUPS & BROADCASTS ---
-        if (chat.isGroup || chat.id.server === "g.us") continue;
-        if (chat.id.server === "broadcast") continue;
+            if (!primaryChatName.toLowerCase().includes("clt")) {
+                // console.log(`⚠️ Skipping chat ${chat.id.user} - Name ("${primaryChatName}") does not contain "clt"`);
+                continue; 
+            }
+            
+            console.log(`✅ Processing CLT chat: ${primaryChatName}`);
 
-        // --- 2️⃣ Only chats related to your admin numbers ---
-        const chatNumber = clean(chat.id._serialized);
+            // --- 3️⃣ Fetch last messages (Only called for CLT chats now) ---
+            const messages = await chat.fetchMessages({ limit: 100 });
 
-        const isRelevantChat = currentNumbers.some(num =>
-          chatNumber.endsWith(clean(num))
-        );
+            for (const message of messages) {
+                const messageDate = new Date(message.timestamp * 1000);
 
-        if (!isRelevantChat) continue;
+                if (!message.body || message.body.trim() === "") continue;
 
-        // --- 3️⃣ Fetch last messages ---
-        const messages = await chat.fetchMessages({ limit: 100 });
+                // Skip duplicates
+                const existing = await this.databaseService.getClientMessageByMessageId(
+                    message.id._serialized
+                );
+                if (existing) continue;
 
-        for (const message of messages) {
-          const messageDate = new Date(message.timestamp * 1000);
+                // Determine direction (Assumes this.isOwnNumber is correctly implemented)
+                const isOwnMessage = this.isOwnNumber(message.from);
+                const isIncoming = !isOwnMessage;
+                const direction = isIncoming ? "incoming" : "outgoing";
+                
+                console.log(`📨 New ${direction} message from ${message.from} at ${messageDate.toISOString()}: "${message.body.substring(0, 50)}..."`);
+                
+                // --- 4️⃣ Extract client/admin name ---
+                const contact = await message.getContact();
 
-          if (!message.body || message.body.trim() === "") continue;
+                let clientName = "";
+                if (isIncoming) {
+                    // Incoming (Client to Admin) → message.from is the client
+                    clientName =
+                        contact?.name ||
+                        contact?.notifyName ||
+                        chat.name ||
+                        chat.contact?.pushname ||
+                        chat.contact?.name ||
+                        chat.contact?.notifyName ||
+                        "";
+                    console.log("==== Debug Contact Fields ====");
+                    console.log("contact.pushname:", contact?.pushname);
+                    console.log("contact.name:", contact?.name);
+                    console.log("contact.notifyName:", contact?.notifyName);
+                    console.log("chat.name:", chat.name);
+                    console.log("chat.contact.pushname:", chat.contact?.pushname);
+                    console.log("chat.contact.name:", chat.contact?.name);
+                    console.log("chat.contact.notifyName:", chat.contact?.notifyName);
+                    console.log("message.from:", message.from);
+                    console.log("message.to:", message.to);
+                    console.log("isIncoming:", isIncoming);
+                    console.log("==============================");
+                } else {
+                    // Outgoing (Admin to Client) → message.getContact() is YOU (admin), 
+                    // so we use the chat's properties for the client's name
+                    clientName =
+                        chat.name ||
+                        chat.contact?.pushname ||
+                        chat.contact?.name ||
+                        chat.contact?.notifyName ||
+                        "";
+                }
 
-          // Skip duplicates
-          const existing = await this.databaseService.getClientMessageByMessageId(
-            message.id._serialized
-          );
-          if (existing) continue;
+                console.log(`Extracted client name: ${clientName}`);
 
-          // Determine direction
-          const isIncoming = message.from
-            ? !currentNumbers.some(num => clean(message.from!) === clean(num))
-            : false;
-          const direction = isIncoming ? "incoming" : "outgoing";
+                // --- 5️⃣ Final safety check: Only save if CLT name appears ---
+                // This confirms the extracted name (which could be from multiple fallbacks) is correct.
+                if (!clientName.toLowerCase().includes("clt")) continue;
+                
+                console.log(`message.to`, message.to);
+                console.log(`message.from`, message.from);
+                
+                // Save message
+                await this.databaseService.saveClientMessage({
+                    clientName,
+                    // The number to save is always the sender's number (message.from)
+                    number: message.from, 
+                    direction,
+                    message: message.body,
+                    timestamp: messageDate,
+                    messageId: message.id._serialized,
+                });
 
-          console.log(`📨 New ${direction} message from ${message.from} at ${messageDate.toISOString()}: "${message.body.substring(0, 50)}..."`);
-          // --- 4️⃣ Extract client/admin name ---
-          const contact = await message.getContact();
-
-          let clientName = "";
-          if (isIncoming) {
-            // Incoming → contact is client
-
-            clientName =
-              contact?.name ||
-              contact?.notifyName ||
-              chat.name ||
-              chat.contact?.pushname ||
-              chat.contact?.name ||
-              chat.contact?.notifyName ||
-              "";
-            console.log("==== Debug Contact Fields ====");
-            console.log("contact.pushname:", contact?.pushname);
-            console.log("contact.name:", contact?.name);
-            console.log("contact.notifyName:", contact?.notifyName);
-            console.log("chat.name:", chat.name);
-            console.log("chat.contact.pushname:", chat.contact?.pushname);
-            console.log("chat.contact.name:", chat.contact?.name);
-            console.log("chat.contact.notifyName:", chat.contact?.notifyName);
-            console.log("message.from:", message.from);
-            console.log("message.to:", message.to);
-            console.log("isIncoming:", isIncoming);
-            console.log("==============================");
-          } else {
-            // Outgoing → message.getContact() is YOU (admin)
-            // So use chat.contact to get client
-            clientName =
-              chat.name ||
-              chat.contact?.pushname ||
-              chat.contact?.name ||
-              chat.contact?.notifyName ||
-              "";
-          }
-
-          console.log(`Extracted client name: ${clientName}`);
-
-          // --- 5️⃣ Only save if CLT name appears (Incoming or Outgoing) ---
-          if (!clientName.toLowerCase().includes("clt")) continue;
-          console.log(`message.to`, message.to);
-          console.log(`message.from`, message.from);
-          // Save message
-          await this.databaseService.saveClientMessage({
-            clientName,
-            number: isIncoming ? message.from : message.from,
-            direction,
-            message: message.body,
-            timestamp: messageDate,
-            messageId: message.id._serialized,
-          });
-
-          totalInserted++;
+                totalInserted++;
+            }
         }
-      }
 
-      console.log(`✅ Scan complete. Inserted ${totalInserted} new messages.`);
+        console.log(`✅ Scan complete. Inserted ${totalInserted} new messages.`);
     } catch (error) {
-      console.error("❌ Error scanning and inserting messages:", error);
+        console.error("❌ Error scanning and inserting messages:", error);
     }
-  }
-
+}
+  private isOwnNumber(id: string): boolean {
+    if (!this.selfId) return false;
+    
+    // Clean and compare the provided ID with the stored selfId
+    const cleanedId = (id ?? "").replace(/@.+$/, "");
+    const cleanedSelfId = (this.selfId ?? "").replace(/@.+$/, "");
+    
+    return cleanedId === cleanedSelfId;
+}
   private setupEventHandlers(): void {
     this.client?.on('qr', (qr: string) => {
       qrcode.generate(qr, { small: true }, (renderedQrCode) => {
@@ -285,6 +291,11 @@ class WhatsAppAgent {
 
     this.client?.on('ready', async () => {
       console.log('WhatsApp client is ready!');
+      const info = this.client?.info;
+    if (info) {
+        this.selfId = info.wid._serialized;
+        console.log(`✅ Client's own WID captured: ${this.selfId}`);
+    }
       this.isReady = true;
       this.startRefreshTimer();
       // Update database with authentication status
