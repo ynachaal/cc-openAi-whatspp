@@ -17,30 +17,32 @@ const batchTimeouts = new Map<string, NodeJS.Timeout>(); // Stores timeout IDs
 
 // Defines the fixed structure of data received from the worker
 interface ClientRowData {
-    date: string;
-    customer_sequence_last: string;
-    client_middle_code: string;
-    classification: string;
-    name: string;
-    mobile_1: string;
-    budget: string;
-    preferred_size: string;
-    preferred_area: string;
-    status: string;
-    individual_name: string;
-    remarks: string;
-    follow_up_status: string;
+    date: string;
+    customer_sequence_last: string;
+    client_middle_code: string;
+    classification: string;
+    name: string;
+    mobile_1: string;
+    budget: string;
+    preferred_size: string;
+    preferred_area: string;
+    status: string;
+    individual_name: string;
+    remarks: string;
+    follow_up_status: string;
+    // NEW: Field to hold the structured daily sentiment data
+    dailySentiments: any;
 }
 
 interface PendingMessage {
-    data: ClientRowData; // Specific data structure for Client sheet
-    userInfo: { phone: string; name: string };
-    sheetName: string;
-    originalMessage: string | undefined;
-    messageTimestamp: number | undefined;
-      sheetRowIndex: number | undefined; // <-- explicitly include undefined
-      resolve: (rowIndex: number) => void; // <-- change from boolean to number
-    reject: (error: any) => void;
+    data: ClientRowData; // Specific data structure for Client sheet
+    userInfo: { phone: string; name: string };
+    sheetName: string;
+    originalMessage: string | undefined;
+    messageTimestamp: number | undefined;
+    sheetRowIndex: number | undefined; // <-- explicitly include undefined
+    resolve: (rowIndex: number) => void; // <-- change from boolean to number
+    reject: (error: any) => void;
 }
 
 // Use a map, but only expect the 'Client' key
@@ -64,7 +66,6 @@ function setCachedApiKeys(data: any): void {
 
 // Function to initialize Google Auth with credentials from database (unchanged)
 async function initializeGoogleAuth() {
-    // ... (logic for initializeGoogleAuth - unchanged)
     try {
         let apiKeys = getCachedApiKeys();
         if (!apiKeys) {
@@ -108,7 +109,6 @@ async function initializeSheets() {
 
 // Function to get Google Sheet ID from database (unchanged)
 async function getGoogleSheetId(): Promise<string> {
-    // ... (logic for getGoogleSheetId - unchanged)
     try {
         let apiKeys = getCachedApiKeys();
         if (!apiKeys) {
@@ -138,47 +138,98 @@ async function getGoogleSheetId(): Promise<string> {
 
 // Defines the exact order of columns for the Client sheet
 function getClientHeaders(): string[] {
-    return [
-        'Date',
-        'Customer Sequence - Last',
-        'Middle', 
-        'Classification', 
+    const baseHeaders = [
+        'Date',
+        'Customer Sequence - Last',
+        'Middle', 
+        'Classification', 
         'Name',
-        'Mobile 1',
-        'Budget',
-        'Preferred Size',
-        'Preferred Area',
-        'Status',
-        'Individual Name',
-        'Remarks',
-        'Follow Up Status',
-     
-    ];
+        'Mobile 1',
+        'Budget',
+        'Preferred Size',
+        'Preferred Area',
+        'Status',
+        'Individual Name',
+        'Remarks',
+        'Follow Up Status',
+    ];
+
+    // NEW: Add columns for daily sentiment up to Day 10
+    for (let i = 1; i <= 10; i++) {
+        baseHeaders.push(`Day ${i} Response`);
+    }
+
+    return baseHeaders;
+}
+
+/**
+ * Parses the dailySentiment data, orders it by date, and pads it to 10 entries.
+ * UPDATED: Prepends the date to the sentiment value (e.g., 'YYYY.MM.DD:Sentiment').
+ * @param dailySentimentData The object or stringified object containing daily sentiments.
+ * @returns An array of 10 sentiment strings/empty strings.
+ */
+function getOrderedDailySentiments(dailySentimentData: any): (string)[] {
+    let parsedData: Record<string, string> = {};
+    
+    if (typeof dailySentimentData === 'string') {
+        try {
+            // Handle cases where the string might be 'null' or not valid JSON
+            const trimmedData = dailySentimentData.trim();
+            if (trimmedData && trimmedData !== 'null') {
+                parsedData = JSON.parse(trimmedData);
+            }
+        } catch (e) {
+            console.error("Failed to parse dailySentiment JSON string:", e);
+        }
+    } else if (dailySentimentData && typeof dailySentimentData === 'object' && !Array.isArray(dailySentimentData)) {
+        parsedData = dailySentimentData as Record<string, string>;
+    }
+
+    // Extract date keys (format YYYY.MM.DD) and sort them chronologically
+    const sortedDates = Object.keys(parsedData).sort();
+    
+    // Map sorted dates to sentiment values, including the date in the format 'YYYY.MM.DD:Sentiment'
+    const sentiments = sortedDates.map(dateKey => {
+        const sentiment = parsedData[dateKey] || '';
+        // Only include the combined string if a sentiment value exists
+        return sentiment ? `${dateKey}:${sentiment}` : '';
+    }).filter(s => s !== ''); // Filter out empty strings if sentiment was missing for a date
+
+    
+    // Pad the array up to 10 entries with empty strings
+    const paddedSentiments = [...sentiments];
+    while (paddedSentiments.length < 10) {
+        paddedSentiments.push('');
+    }
+
+    // Return only the first 10
+    return paddedSentiments.slice(0, 10);
 }
 
 // Function to map the incoming data keys to the header columns
 function mapClientRowData(message: PendingMessage): any[] {
-    const data = message.data;
-/*     const timestamp = message.messageTimestamp 
-        ? formatDubaiTime(message.messageTimestamp) 
-        : formatDubaiTime(Date.now()); */
-        
-    return [
-        data.date || '',
-        data.customer_sequence_last || '',
-        data.client_middle_code || '',
-        data.classification || '',
-        data.name || '',
-        data.mobile_1 || '',
-        data.budget || '',
-        data.preferred_size || '',
-        data.preferred_area || '',
-        data.status || '',
-        data.individual_name || '',
-        data.remarks || '',
-        data.follow_up_status || '',
-       
-    ];
+    const data = message.data;
+    
+    // NEW: Process daily sentiments
+    const orderedSentiments = getOrderedDailySentiments(data.dailySentiments);
+
+    return [
+        data.date || '',
+        data.customer_sequence_last || '',
+        data.client_middle_code || '',
+        data.classification || '',
+        data.name || '',
+        data.mobile_1 || '',
+        data.budget || '',
+        data.preferred_size || '',
+        data.preferred_area || '',
+        data.status || '',
+        data.individual_name || '',
+        data.remarks || '',
+        data.follow_up_status || '',
+        // NEW: Add daily sentiment columns
+        ...orderedSentiments,
+    ];
 }
 
 
@@ -186,9 +237,8 @@ function mapClientRowData(message: PendingMessage): any[] {
 
 // Function to check if a sheet exists and create it if it doesn't
 async function ensureSheetExists(sheetName: string) {
-    if (sheetName !== CLIENT_SHEET_NAME) throw new Error("This service only manages the 'Client' sheet.");
+    if (sheetName !== CLIENT_SHEET_NAME) throw new Error("This service only manages the 'Client' sheet.");
     const spreadsheetId = await getGoogleSheetId();
-    // ... (logic for sheet existence and creation - unchanged)
     // Check cache first
     const cached = sheetCache.get(sheetName);
     if (cached && Date.now() - cached.lastChecked < CACHE_TTL && cached.exists) {
@@ -227,8 +277,8 @@ async function ensureSheetExists(sheetName: string) {
 
 // Function to ensure headers exist for the Client sheet
 async function ensureHeaders(sheetName: string, forceUpdate: boolean = false) {
-    if (sheetName !== CLIENT_SHEET_NAME) return;
-    
+    if (sheetName !== CLIENT_SHEET_NAME) return;
+    
     const spreadsheetId = await getGoogleSheetId();
     // Check cache first (unless forcing update)
     if (!forceUpdate) {
@@ -244,14 +294,15 @@ async function ensureHeaders(sheetName: string, forceUpdate: boolean = false) {
         await ensureSheetExists(sheetName);
 
         const currentHeaders = getClientHeaders();
-        const headerRange = `${sheetName}!A1:${String.fromCharCode(65 + currentHeaders.length - 1)}1`;
+        const endColumnChar = String.fromCharCode(65 + currentHeaders.length - 1);
+        const headerRange = `${sheetName}!A1:${endColumnChar}1`;
 
         // Check if headers exist
         const response = await sheets.spreadsheets.values.get({ spreadsheetId, range: headerRange });
 
         // Update logic remains the same, comparing existing vs currentHeaders
         const existingHeaders = response.data.values?.[0] || [];
-        const headersChanged = existingHeaders.join(',') !== currentHeaders.join(',');
+        const headersChanged = existingHeaders.join(',') !== currentHeaders.slice(0, existingHeaders.length).join(',') || existingHeaders.length !== currentHeaders.length;
 
         if (!response.data.values || headersChanged) {
             await sheets.spreadsheets.values.update({
@@ -275,100 +326,100 @@ async function ensureHeaders(sheetName: string, forceUpdate: boolean = false) {
 
 // --- PROCESS CLIENT BATCH ---
 export async function processClientBatch(messages: PendingMessage[]) {
-  if (messages.length === 0) return;
+  if (messages.length === 0) return;
 
-  const timeoutId = batchTimeouts.get(CLIENT_SHEET_NAME);
-  if (timeoutId) {
-    clearTimeout(timeoutId);
-    batchTimeouts.delete(CLIENT_SHEET_NAME);
-  }
+  const timeoutId = batchTimeouts.get(CLIENT_SHEET_NAME);
+  if (timeoutId) {
+    clearTimeout(timeoutId);
+    batchTimeouts.delete(CLIENT_SHEET_NAME);
+  }
 
-  try {
-    const spreadsheetId = await getGoogleSheetId();
-    if (!auth || !sheets) await initializeSheets();
-    await ensureHeaders(CLIENT_SHEET_NAME);
+  try {
+    const spreadsheetId = await getGoogleSheetId();
+    if (!auth || !sheets) await initializeSheets();
+    await ensureHeaders(CLIENT_SHEET_NAME);
 
-    const headers = getClientHeaders();
-    const endColumn = String.fromCharCode(65 + headers.length - 1);
+    const headers = getClientHeaders();
+    const endColumn = String.fromCharCode(65 + headers.length - 1);
 
-    for (const msg of messages) {
-      const rowData = mapClientRowData(msg);
+    for (const msg of messages) {
+      const rowData = mapClientRowData(msg);
 
-      if (msg.sheetRowIndex) {
-        // ✅ Update existing row
-        const rowIndex = msg.sheetRowIndex;
-        const range = `${CLIENT_SHEET_NAME}!A${rowIndex}:${endColumn}${rowIndex}`;
-        await sheets.spreadsheets.values.update({
-          spreadsheetId,
-          range,
-          valueInputOption: 'USER_ENTERED',
-          requestBody: { values: [rowData] },
-        });
-        msg.resolve(rowIndex);
-      } else {
-        // Append new row
-        const result = await sheets.spreadsheets.values.append({
-          spreadsheetId,
-          range: `${CLIENT_SHEET_NAME}!A:${endColumn}`,
-          valueInputOption: 'USER_ENTERED',
-          requestBody: { values: [rowData] },
-        });
+      if (msg.sheetRowIndex) {
+        // ✅ Update existing row
+        const rowIndex = msg.sheetRowIndex;
+        const range = `${CLIENT_SHEET_NAME}!A${rowIndex}:${endColumn}${rowIndex}`;
+        await sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: { values: [rowData] },
+        });
+        msg.resolve(rowIndex);
+      } else {
+        // Append new row
+        const result = await sheets.spreadsheets.values.append({
+          spreadsheetId,
+          range: `${CLIENT_SHEET_NAME}!A:${endColumn}`,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: { values: [rowData] },
+        });
 
-        // Get the new row index
-        const startRow = Number(result.data.updates?.updatedRange?.match(/\d+$/)?.[0]);
-        msg.resolve(startRow);
-      }
-    }
+        // Get the new row index
+        const startRow = Number(result.data.updates?.updatedRange?.match(/\d+$/)?.[0]);
+        msg.resolve(startRow);
+      }
+    }
 
-    console.log(`📊 Batch processed: ${messages.length} messages sent to ${CLIENT_SHEET_NAME} sheet`);
-  } catch (error) {
-    console.error(`Error processing batch for ${CLIENT_SHEET_NAME}:`, error);
-    messages.forEach(msg => msg.reject(error));
-  }
+    console.log(`📊 Batch processed: ${messages.length} messages sent to ${CLIENT_SHEET_NAME} sheet`);
+  } catch (error) {
+    console.error(`Error processing batch for ${CLIENT_SHEET_NAME}:`, error);
+    messages.forEach(msg => msg.reject(error));
+  }
 }
 
 export function addToClientBatch(
-  data: ClientRowData,
-  userInfo: { phone: string; name: string },
-  originalMessage?: string,
-  messageTimestamp?: number,
-  sheetRowIndex?: number
+  data: ClientRowData,
+  userInfo: { phone: string; name: string },
+  originalMessage?: string,
+  messageTimestamp?: number,
+  sheetRowIndex?: number
 ): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const message: PendingMessage = {
-      data,
-      userInfo,
-      sheetName: CLIENT_SHEET_NAME,
-      originalMessage,
-      messageTimestamp,
-      sheetRowIndex,  // optional existing row index for updates
-      resolve,
-      reject
-    };
+  return new Promise((resolve, reject) => {
+    const message: PendingMessage = {
+      data,
+      userInfo,
+      sheetName: CLIENT_SHEET_NAME,
+      originalMessage,
+      messageTimestamp,
+      sheetRowIndex,  // optional existing row index for updates
+      resolve,
+      reject
+    };
 
-    if (!pendingMessages.has(CLIENT_SHEET_NAME)) {
-      pendingMessages.set(CLIENT_SHEET_NAME, []);
-    }
-    pendingMessages.get(CLIENT_SHEET_NAME)!.push(message);
+    if (!pendingMessages.has(CLIENT_SHEET_NAME)) {
+      pendingMessages.set(CLIENT_SHEET_NAME, []);
+    }
+    pendingMessages.get(CLIENT_SHEET_NAME)!.push(message);
 
-    const messages = pendingMessages.get(CLIENT_SHEET_NAME)!;
+    const messages = pendingMessages.get(CLIENT_SHEET_NAME)!;
 
-    if (messages.length >= BATCH_SIZE) {
-      pendingMessages.set(CLIENT_SHEET_NAME, []);
-      processClientBatch(messages);
-    } else {
-      if (!batchTimeouts.has(CLIENT_SHEET_NAME)) {
-        const timeoutId = setTimeout(() => {
-          const currentMessages = pendingMessages.get(CLIENT_SHEET_NAME);
-          if (currentMessages && currentMessages.length > 0) {
-            pendingMessages.set(CLIENT_SHEET_NAME, []);
-            processClientBatch(currentMessages);
-          }
-        }, BATCH_TIMEOUT);
-        batchTimeouts.set(CLIENT_SHEET_NAME, timeoutId);
-      }
-    }
-  });
+    if (messages.length >= BATCH_SIZE) {
+      pendingMessages.set(CLIENT_SHEET_NAME, []);
+      processClientBatch(messages);
+    } else {
+      if (!batchTimeouts.has(CLIENT_SHEET_NAME)) {
+        const timeoutId = setTimeout(() => {
+          const currentMessages = pendingMessages.get(CLIENT_SHEET_NAME);
+          if (currentMessages && currentMessages.length > 0) {
+            pendingMessages.set(CLIENT_SHEET_NAME, []);
+            processClientBatch(currentMessages);
+          }
+        }, BATCH_TIMEOUT);
+        batchTimeouts.set(CLIENT_SHEET_NAME, timeoutId);
+      }
+    }
+  });
 }
 
 
@@ -402,7 +453,6 @@ export async function syncClientSheetHeaders(): Promise<void> {
 
 // Function to update the Google Sheet ID and sync sheets
 export async function updateGoogleSheetIdAndSyncClient(sheetId: string) {
-    // ... (logic for sheet ID update and sync - unchanged, but only calls client sync)
     if (!sheetId) return;
 
     try {
